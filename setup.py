@@ -16,6 +16,23 @@ setup(
     url = "http://todo.todo",
     packages=['rectifiedgrid'],
     # long_description=read('README'),
+    install_requires = [
+        # I/O
+        'rasterio',
+        'fiona',
+
+        # data structures and analyses
+        'numpy',
+        'geopandas',
+        'scipy',
+
+        # vector data utils
+        'shapely',
+        'rtree',
+
+        # utils
+        'affine'
+    ],
     classifiers=[
         "Development Status :: 3 - Alpha",
         "Topic :: Utilities",
