@@ -85,16 +85,23 @@ def read_features_like(rgrid, features, compute_area=False, copy=True):
     return raster
 
 
-def read_raster(raster):
+def read_raster(raster, masked=False):
     src = rasterio.open(raster)
     if src.count > 1:
         src.close()
         raise NotImplementedError('Cannot load a multiband layer')
     proj = parse_projection(src.crs)
-    rgrid = RectifiedGrid(src.read(1),
-                          proj,
-                          src.affine,
-                          mask=np.ma.nomask)
+    if masked:
+        _raster = src.read(1, masked=masked)
+        rgrid = RectifiedGrid(_raster,
+                              proj,
+                              src.affine,
+                              mask=_raster.mask)
+    else:
+        rgrid = RectifiedGrid(src.read(1, masked=masked),
+                              proj,
+                              src.affine,
+                              mask=np.ma.nomask)
     src.close()
     return rgrid
 
@@ -282,13 +289,15 @@ class RectifiedGrid(SubRectifiedGrid, np.ma.core.MaskedArray):
             'height': self.shape[0],
         }
 
-        with rasterio.drivers():
+        # with rasterio.drivers():
+        with rasterio.Env(GDAL_TIFF_INTERNAL_MASK=True):
             with rasterio.open(filepath, 'w', **profile) as dst:
                 if multi:
                     for band in range(count):
                         dst.write_band(band+1, self[:,:,band].astype(rasterio.float64))
                 else:
                     dst.write_band(1, self.astype(rasterio.float64))
+                dst.write_mask(255 * (~self.mask).astype('uint8'))
                 dst.close()
         return True
 
