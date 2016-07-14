@@ -93,12 +93,13 @@ def read_raster(raster, masked=False):
     proj = parse_projection(src.crs)
     if masked:
         _raster = src.read(1, masked=masked)
+        # return _raster
         rgrid = RectifiedGrid(_raster,
                               proj,
                               src.affine,
                               mask=_raster.mask)
     else:
-        rgrid = RectifiedGrid(src.read(1, masked=masked),
+        rgrid = RectifiedGrid(src.read(1),
                               proj,
                               src.affine,
                               mask=np.ma.nomask)
@@ -248,8 +249,8 @@ class RectifiedGrid(SubRectifiedGrid, np.ma.core.MaskedArray):
 
         p_ll = Point(*ll)
         p_ur = Point(*ur)
-        ll = transform(p_ll, self.proj, "epsg:4326")
-        ur = transform(p_ur, self.proj, "epsg:4326")
+        ll = transform(p_ll, self.proj, parse_projection("epsg:4326"))
+        ur = transform(p_ur, self.proj, parse_projection("epsg:4326"))
         return ll.x, ll.y, ur.x, ur.y
 
     @property
@@ -297,7 +298,8 @@ class RectifiedGrid(SubRectifiedGrid, np.ma.core.MaskedArray):
                         dst.write_band(band+1, self[:,:,band].astype(rasterio.float64))
                 else:
                     dst.write_band(1, self.astype(rasterio.float64))
-                dst.write_mask(255 * (~self.mask).astype('uint8'))
+                if self.mask.any():
+                    dst.write_mask(255 * (~self.mask).astype('uint8'))
                 dst.close()
         return True
 

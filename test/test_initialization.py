@@ -56,8 +56,6 @@ class TestInitialization(object):
         grid = rg.read_vector(vector, res=10000, eea=True,
                               epsg=3035, compute_area=True)
         assert grid.bounds == (4490000, 1520000, 5490000, 2530000)
-        print grid.crs
-        grid.write_raster('/tmp/a.tiff')
 
     def test_feature(self):
         grid = get_demo_data('line3035')
@@ -97,3 +95,9 @@ class TestInitialization(object):
         assert grid1.sum() == 13.
         grid1.patch_max(grid2)
         assert grid1.sum() == 14.
+
+    def test_projection(self):
+        grid1 = get_demo_data('rg9x9')
+        grid1.norm()
+        print grid1.proj
+        assert (1 == 2)

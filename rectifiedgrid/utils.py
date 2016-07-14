@@ -2,6 +2,7 @@ import pyproj
 import math
 from shapely import ops
 from functools import partial
+from rasterio.crs import CRS
 
 EEA_GRID_RESOLUTIONS = [25, 100, 250, 500, 1000, 2500, 10000, 25000, 100000]
 
@@ -37,6 +38,8 @@ def parse_projection(p):
     """
     if isinstance(p, pyproj.Proj):
         return p
+    if isinstance(p, CRS):
+        return pyproj.Proj(p)
     elif isinstance(p, int):
         return pyproj.Proj(init='epsg:{}'.format(p))
     elif isinstance(p, str):
