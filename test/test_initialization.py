@@ -62,20 +62,10 @@ class TestInitialization(object):
         assert grid.shape == (12, 10)
         assert grid.sum() == 21
 
-    def test_positive(self):
-        grid = get_demo_data()
-        grid.positive()
-        assert (grid.min(), grid.max()) == (0., 4.)
-
     def test_masked_value(self):
         grid = get_demo_data()
         grid.masked_values(0.)
         assert round(grid.mean(), 2) == 1.36
-
-    def test_gaussian_filter(self):
-        grid = get_demo_data('rg9x9')
-        grid.gaussian_filter(2.)
-        assert round(grid.sum(), 2) == 0.95
 
     def test_reproject(self):
         grid4326 = get_demo_data('line4326')
