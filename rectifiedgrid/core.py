@@ -15,7 +15,9 @@ from rtree.index import Index as RTreeIndex
 from scipy import ndimage
 from itertools import izip
 import matplotlib.pyplot as plt
+from matplotlib import colors
 from mpl_toolkits import basemap
+
 
 logger = logging.getLogger(__name__)
 
@@ -269,7 +271,7 @@ class RectifiedGrid(SubRectifiedGrid, np.ma.core.MaskedArray):
             crs[k.replace('+', '')] = v
         return crs
 
-    def write_raster(self, filepath, dtype='float64', driver='GTiff'):
+    def write_raster(self, filepath, dtype='float64', driver='GTiff', nodata=None):
         """Write a raster file
         """
         multi = False
@@ -283,12 +285,21 @@ class RectifiedGrid(SubRectifiedGrid, np.ma.core.MaskedArray):
             'crs': self.crs,
             'driver': driver,
             'dtype': dtype,
-            'nodata': 0,
+            #'nodata': 0,
             #'tiled': False,
             'transform': self.gtransform,
             'width': self.shape[1],
             'height': self.shape[0],
         }
+
+        if nodata is not None:
+            profile['nodata'] = nodata
+            with rasterio.open(filepath, 'w', **profile) as dst:
+                d = self.data.copy()
+                d[self.mask] = nodata
+
+                dst.write_band(1, d.astype(rasterio.float64))
+            return True
 
         # with rasterio.drivers():
         with rasterio.Env(GDAL_TIFF_INTERNAL_MASK=True):
@@ -390,3 +401,54 @@ class RectifiedGrid(SubRectifiedGrid, np.ma.core.MaskedArray):
             llcrnrlon=minx, llcrnrlat=miny, urcrnrlon=maxx, urcrnrlat=maxy,
             resolution='h',
             epsg=epsg, ax=ax)
+
+    def plotmap(self, legend=False, arcgis=False, coast=False, countries=False,
+                rivers=False, grid=False, bluemarble=False, etopo=False,
+                maptype=None, cmap=None, norm=None, logcolor=False, vmin=None,
+                vmax=None, ax=None):
+
+        if maptype == 'minimal':
+            coast = True,
+            countries = True
+        elif maptype == 'full':
+            coast = True,
+            countries = True
+            rivers = True
+            arcgis = True
+            grid = True
+
+        m = self.get_basemap(ax=ax)
+
+        if cmap is not None and isinstance(cmap, str):
+            cmap = plt.get_cmap(cmap)
+
+        if logcolor:
+            norm = colors.SymLogNorm(linthresh=5, linscale=1,
+                                     vmin=self.min(), vmax=self.max())
+
+        if bluemarble:
+            m.bluemarble()
+
+        if etopo:
+            m.etopo()
+
+        if arcgis:
+            m.arcgisimage(service='ESRI_Imagery_World_2D',
+                          xpixels=2000, verbose= True)
+
+        mapimg = m.imshow(np.flipud(self), cmap=cmap, norm=norm,
+                          vmin=vmin, vmax=vmax)
+
+        if coast:
+            m.drawcoastlines()
+        if countries:
+            m.drawcountries()
+        if rivers:
+            m.drawrivers(linewidth=0.2, linestyle='solid', color='b')
+        if grid:
+            m.drawparallels(np.arange(-90,90,2),labels=[1,0,0,0],fontsize=10)
+            m.drawmeridians(np.arange(-90,90,2),labels=[0,0,0,1],fontsize=10)
+        if legend:
+            plt.colorbar(mapimg, orientation='vertical', ax=ax)
+
+        return m
