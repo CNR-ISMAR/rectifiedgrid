@@ -451,4 +451,4 @@ class RectifiedGrid(SubRectifiedGrid, np.ma.core.MaskedArray):
         if legend:
             plt.colorbar(mapimg, orientation='vertical', ax=ax)
 
-        return m
+        return m, mapimg
