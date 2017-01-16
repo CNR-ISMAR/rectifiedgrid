@@ -389,6 +389,12 @@ class RectifiedGrid(SubRectifiedGrid, np.ma.core.MaskedArray):
         raster[:] = destination[:]
         return raster
 
+    def zoom(self, zoom, resampling=RESAMPLING.bilinear):
+        res = self.resolution / zoom
+        print res
+        rgrid = _geofactory(self.bounds, self.proj, res)
+        return rgrid.reproject(self)
+
     def plot(self, cmap='Greys'):
         if isinstance(cmap, str):
             cmap = plt.get_cmap(cmap)
