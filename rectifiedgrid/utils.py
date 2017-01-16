@@ -12,6 +12,10 @@ def calculate_gbounds(bounds, res):
     mapheight = bounds[3] - bounds[1]
     width_reminder = (res - math.fmod(mapwidth, res))
     height_reminder = (res - math.fmod(mapheight, res))
+    if width_reminder == res:
+        width_reminder = 0
+    if height_reminder == res:
+        height_reminder = 0
     gbounds = [
         bounds[0] - width_reminder/2.,
         bounds[1] - height_reminder/2.,
