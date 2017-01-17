@@ -274,11 +274,7 @@ class RectifiedGrid(SubRectifiedGrid, np.ma.core.MaskedArray):
     def write_raster(self, filepath, dtype='float64', driver='GTiff', nodata=None):
         """Write a raster file
         """
-        multi = False
         count = 1
-        if len(self.shape) == 3:
-            count = self.shape[2]
-            multi = True
 
         profile = {
             'count': count,
@@ -304,11 +300,7 @@ class RectifiedGrid(SubRectifiedGrid, np.ma.core.MaskedArray):
         # with rasterio.drivers():
         with rasterio.Env(GDAL_TIFF_INTERNAL_MASK=True):
             with rasterio.open(filepath, 'w', **profile) as dst:
-                if multi:
-                    for band in range(count):
-                        dst.write_band(band+1, self[:,:,band].astype(rasterio.float64))
-                else:
-                    dst.write_band(1, self.astype(rasterio.float64))
+                dst.write_band(1, self.astype(rasterio.float64))
                 if self.mask.any():
                     dst.write_mask(255 * (~self.mask).astype('uint8'))
                 dst.close()
