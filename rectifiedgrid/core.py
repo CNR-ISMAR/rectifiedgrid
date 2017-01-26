@@ -44,7 +44,6 @@ def read_df(gdf, res, column=None, value=1., compute_area=False,
             bounds = gdf.total_bounds
         grid = _geofactory(bounds, proj, res, dtype, eea)
     else:
-        print "grid used"
         grid = grid.copy()
 
     return read_df_like(grid, gdf, column, value, compute_area, copy=False)
@@ -130,10 +129,10 @@ def _geofactory(bounds, proj, res, dtype=np.float64, eea=False):
     rows = int(round((gbounds[3] - gbounds[1]) / res))
     _gtransform = (gbounds[0], res, 0.0, gbounds[3], 0.0, -res)
     gtransform = Affine.from_gdal(*_gtransform)
+    # we use copy=True in order to avoid sharedmask=True
     return RectifiedGrid(np.zeros((rows, cols), dtype),
                          proj,
-                         gtransform,
-                         mask=np.ma.nomask)
+                         gtransform)
 
 
 class SubRectifiedGrid(np.ndarray):
@@ -165,9 +164,11 @@ class SubRectifiedGrid(np.ndarray):
 
 
 class RectifiedGrid(SubRectifiedGrid, np.ma.core.MaskedArray):
-    def __new__(cls, data, proj, gtransform, mask=np.ma.nomask):
+    # we use copy=True in order to avoid sharedmask=True
+    def __new__(cls, data, proj, gtransform, mask=np.ma.nomask, copy=True, **kwargs):
         subarr = SubRectifiedGrid(data, proj, gtransform)
-        _data = np.ma.core.MaskedArray.__new__(cls, data=subarr, mask=mask)
+        _data = np.ma.core.MaskedArray.__new__(cls, data=subarr,
+                                               mask=mask, copy=copy, **kwargs)
         _data.proj = subarr.proj
         _data.gtransform = subarr.gtransform
         return _data
@@ -406,7 +407,6 @@ class RectifiedGrid(SubRectifiedGrid, np.ma.core.MaskedArray):
 
     def zoom(self, zoom, resampling=RESAMPLING.bilinear):
         res = self.resolution / zoom
-        print res
         rgrid = _geofactory(self.bounds, self.proj, res)
         return rgrid.reproject(self)
 
