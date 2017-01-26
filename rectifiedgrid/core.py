@@ -23,23 +23,31 @@ logger = logging.getLogger(__name__)
 
 
 def read_vector(vector, res, column=None, value=1., compute_area=False,
-                dtype=np.float64, eea=False, epsg=None):
+                dtype=np.float64, eea=False, epsg=None,
+                bounds=None, grid=None):
     gdf = GeoDataFrame.from_file(vector)
-    return read_df(gdf, res, column, value, compute_area, dtype, eea, epsg)
+    return read_df(gdf, res, column, value, compute_area,
+                   dtype, eea, epsg, bounds, grid)
 
 
 def read_df(gdf, res, column=None, value=1., compute_area=False,
-            dtype=np.float64, eea=False, epsg=None):
+            dtype=np.float64, eea=False, epsg=None, bounds=None,
+            grid=None):
     if epsg is not None:
         gdf.to_crs(epsg=epsg, inplace=True)
         proj = parse_projection(epsg)
     else:
         proj = parse_projection(gdf.crs)
 
-    bounds = gdf.total_bounds
+    if grid is None:
+        if bounds is None:
+            bounds = gdf.total_bounds
+        grid = _geofactory(bounds, proj, res, dtype, eea)
+    else:
+        print "grid used"
+        grid = grid.copy()
 
-    rgrid = _geofactory(bounds, proj, res, dtype, eea)
-    return read_df_like(rgrid, gdf, column, value, compute_area, copy=False)
+    return read_df_like(grid, gdf, column, value, compute_area, copy=False)
 
 
 def read_df_like(rgrid, gdf, column=None, value=1., compute_area=False, copy=True):
@@ -92,7 +100,10 @@ def read_raster(raster, masked=False):
     if src.count > 1:
         src.close()
         raise NotImplementedError('Cannot load a multiband layer')
-    proj = parse_projection(src.crs)
+    if src.crs.is_valid:
+        proj = parse_projection(src.crs)
+    else:
+        proj = None
     if masked:
         _raster = src.read(1, masked=masked)
         # return _raster
@@ -258,6 +269,8 @@ class RectifiedGrid(SubRectifiedGrid, np.ma.core.MaskedArray):
     @property
     def crs(self):
         crs = {}
+        if not self.proj:
+            return crs
         for item in self.proj.srs.split():
             k, v = item.split('=')
             try:
@@ -271,10 +284,13 @@ class RectifiedGrid(SubRectifiedGrid, np.ma.core.MaskedArray):
             crs[k.replace('+', '')] = v
         return crs
 
-    def write_raster(self, filepath, dtype='float64', driver='GTiff', nodata=None):
+    def write_raster(self, filepath, dtype=None, driver='GTiff', nodata=None):
         """Write a raster file
         """
         count = 1
+
+        if dtype is None:
+            dtype = self.dtype
 
         profile = {
             'count': count,
@@ -300,11 +316,18 @@ class RectifiedGrid(SubRectifiedGrid, np.ma.core.MaskedArray):
         # with rasterio.drivers():
         with rasterio.Env(GDAL_TIFF_INTERNAL_MASK=True):
             with rasterio.open(filepath, 'w', **profile) as dst:
-                dst.write_band(1, self.astype(rasterio.float64))
+                dst.write_band(1, self.astype(dtype))
                 if self.mask.any():
                     dst.write_mask(255 * (~self.mask).astype('uint8'))
                 dst.close()
         return True
+
+        # with rasterio.open(filepath, 'w', **profile) as dst:
+        #     dst.write_band(1, self.astype(dtype))
+        #     if self.mask.any():
+        #         dst.write_mask(255 * (~self.mask).astype('uint8'))
+        #     dst.close()
+
 
     def masked_equal(self, value, copy=False):
         raster = self
