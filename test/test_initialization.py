@@ -90,3 +90,7 @@ class TestInitialization(object):
         grid1 = get_demo_data('rg9x9')
         grid1.norm()
         assert (1 == 1)
+
+    def test_unsharedmask(self):
+        grid1 = get_demo_data('rg9x9')
+        assert (grid1.sharedmask == False)
