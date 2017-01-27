@@ -7,7 +7,6 @@ from gisdata import GOOD_DATA
 from shapely import geometry
 import numpy as np
 from scipy import ndimage
-from rasterio.warp import reproject, RESAMPLING
 
 
 class TestMask(object):

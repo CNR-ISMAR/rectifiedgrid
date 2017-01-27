@@ -8,7 +8,11 @@ from .utils import calculate_gbounds, calculate_eea_gbounds, parse_projection, t
 from affine import Affine
 from rasterio.features import rasterize
 import rasterio
-from rasterio.warp import reproject, RESAMPLING
+from rasterio.warp import reproject
+try:
+    from rasterio.warp import RESAMPLING as Resampling
+except:
+    from rasterio.enums import Resampling
 from shapely.geometry import box, Point
 from shapely import ops
 from rtree.index import Index as RTreeIndex
@@ -382,7 +386,7 @@ class RectifiedGrid(SubRectifiedGrid, np.ma.core.MaskedArray):
         return raster
 
     # TODO deal nodata
-    def reproject(self, input_raster, resampling=RESAMPLING.bilinear, copy=False):
+    def reproject(self, input_raster, resampling=Resampling.bilinear, copy=False):
         """Reproject the input_raster using the current grid projection,
         resolution and extension
         """
@@ -405,7 +409,7 @@ class RectifiedGrid(SubRectifiedGrid, np.ma.core.MaskedArray):
         raster[:] = destination[:]
         return raster
 
-    def zoom(self, zoom, resampling=RESAMPLING.bilinear):
+    def zoom(self, zoom, resampling=Resampling.bilinear):
         res = self.resolution / zoom
         rgrid = _geofactory(self.bounds, self.proj, res)
         return rgrid.reproject(self)
