@@ -1,3 +1,4 @@
+import pytest
 import os
 import pyproj
 import rectifiedgrid as rg
@@ -6,7 +7,12 @@ from gisdata import GOOD_DATA
 from shapely import geometry
 import numpy as np
 from scipy import ndimage
-from rasterio.warp import reproject, RESAMPLING
+from rasterio.warp import reproject
+try:
+    from rasterio.enums import Resampling
+except:
+    # rasterio versions 0.xx
+    from rasterio.warp import RESAMPLING as Resampling
 
 
 class TestInitialization(object):
@@ -73,8 +79,9 @@ class TestInitialization(object):
         rgrid = np.zeros_like(grid3035)
         assert rgrid.proj.srs == grid3035.proj.srs
         assert (rgrid.max(), rgrid.min()) == (0., 0.)
-        rgrid.reproject(grid4326, RESAMPLING.nearest)
-        assert (rgrid.max(), rgrid.mean()) == (1., 0.15)
+        rgrid.reproject(grid4326, Resampling.nearest)
+        assert rgrid.max() == 1.
+        assert pytest.approx(rgrid.mean(), 0.001) == 0.1583
 
     def test_patch(self):
         grid1 = get_demo_data('rg9x9')
@@ -90,3 +97,7 @@ class TestInitialization(object):
         grid1 = get_demo_data('rg9x9')
         grid1.norm()
         assert (1 == 1)
+
+    def test_unsharedmask(self):
+        grid1 = get_demo_data('rg9x9')
+        assert (grid1.sharedmask == False)

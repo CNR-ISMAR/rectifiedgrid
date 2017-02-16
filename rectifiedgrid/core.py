@@ -8,11 +8,16 @@ from .utils import calculate_gbounds, calculate_eea_gbounds, parse_projection, t
 from affine import Affine
 from rasterio.features import rasterize
 import rasterio
-from rasterio.warp import reproject, RESAMPLING
+from rasterio.warp import reproject
+try:
+    from rasterio.warp import RESAMPLING as Resampling
+except:
+    from rasterio.enums import Resampling
 from shapely.geometry import box, Point
 from shapely import ops
 from rtree.index import Index as RTreeIndex
 from scipy import ndimage
+from scipy import interpolate
 from itertools import izip
 import matplotlib.pyplot as plt
 from matplotlib import colors
@@ -23,23 +28,30 @@ logger = logging.getLogger(__name__)
 
 
 def read_vector(vector, res, column=None, value=1., compute_area=False,
-                dtype=np.float64, eea=False, epsg=None):
+                dtype=np.float64, eea=False, epsg=None,
+                bounds=None, grid=None):
     gdf = GeoDataFrame.from_file(vector)
-    return read_df(gdf, res, column, value, compute_area, dtype, eea, epsg)
+    return read_df(gdf, res, column, value, compute_area,
+                   dtype, eea, epsg, bounds, grid)
 
 
 def read_df(gdf, res, column=None, value=1., compute_area=False,
-            dtype=np.float64, eea=False, epsg=None):
+            dtype=np.float64, eea=False, epsg=None, bounds=None,
+            grid=None):
     if epsg is not None:
         gdf.to_crs(epsg=epsg, inplace=True)
         proj = parse_projection(epsg)
     else:
         proj = parse_projection(gdf.crs)
 
-    bounds = gdf.total_bounds
+    if grid is None:
+        if bounds is None:
+            bounds = gdf.total_bounds
+        grid = _geofactory(bounds, proj, res, dtype, eea)
+    else:
+        grid = grid.copy()
 
-    rgrid = _geofactory(bounds, proj, res, dtype, eea)
-    return read_df_like(rgrid, gdf, column, value, compute_area, copy=False)
+    return read_df_like(grid, gdf, column, value, compute_area, copy=False)
 
 
 def read_df_like(rgrid, gdf, column=None, value=1., compute_area=False, copy=True):
@@ -92,7 +104,10 @@ def read_raster(raster, masked=False):
     if src.count > 1:
         src.close()
         raise NotImplementedError('Cannot load a multiband layer')
-    proj = parse_projection(src.crs)
+    if src.crs.is_valid:
+        proj = parse_projection(src.crs)
+    else:
+        proj = None
     if masked:
         _raster = src.read(1, masked=masked)
         # return _raster
@@ -119,10 +134,10 @@ def _geofactory(bounds, proj, res, dtype=np.float64, eea=False):
     rows = int(round((gbounds[3] - gbounds[1]) / res))
     _gtransform = (gbounds[0], res, 0.0, gbounds[3], 0.0, -res)
     gtransform = Affine.from_gdal(*_gtransform)
+    # we use copy=True in order to avoid sharedmask=True
     return RectifiedGrid(np.zeros((rows, cols), dtype),
                          proj,
-                         gtransform,
-                         mask=np.ma.nomask)
+                         gtransform)
 
 
 class SubRectifiedGrid(np.ndarray):
@@ -154,9 +169,11 @@ class SubRectifiedGrid(np.ndarray):
 
 
 class RectifiedGrid(SubRectifiedGrid, np.ma.core.MaskedArray):
-    def __new__(cls, data, proj, gtransform, mask=np.ma.nomask):
+    # we use copy=True in order to avoid sharedmask=True
+    def __new__(cls, data, proj, gtransform, mask=np.ma.nomask, copy=True, **kwargs):
         subarr = SubRectifiedGrid(data, proj, gtransform)
-        _data = np.ma.core.MaskedArray.__new__(cls, data=subarr, mask=mask)
+        _data = np.ma.core.MaskedArray.__new__(cls, data=subarr,
+                                               mask=mask, copy=copy, **kwargs)
         _data.proj = subarr.proj
         _data.gtransform = subarr.gtransform
         return _data
@@ -258,6 +275,8 @@ class RectifiedGrid(SubRectifiedGrid, np.ma.core.MaskedArray):
     @property
     def crs(self):
         crs = {}
+        if not self.proj:
+            return crs
         for item in self.proj.srs.split():
             k, v = item.split('=')
             try:
@@ -271,10 +290,13 @@ class RectifiedGrid(SubRectifiedGrid, np.ma.core.MaskedArray):
             crs[k.replace('+', '')] = v
         return crs
 
-    def write_raster(self, filepath, dtype='float64', driver='GTiff', nodata=None):
+    def write_raster(self, filepath, dtype=None, driver='GTiff', nodata=None):
         """Write a raster file
         """
         count = 1
+
+        if dtype is None:
+            dtype = self.dtype
 
         profile = {
             'count': count,
@@ -294,17 +316,23 @@ class RectifiedGrid(SubRectifiedGrid, np.ma.core.MaskedArray):
                 d = self.data.copy()
                 d[self.mask] = nodata
 
-                dst.write_band(1, d.astype(rasterio.float64))
+                dst.write_band(1, d.astype(dtype))
             return True
 
         # with rasterio.drivers():
         with rasterio.Env(GDAL_TIFF_INTERNAL_MASK=True):
             with rasterio.open(filepath, 'w', **profile) as dst:
-                dst.write_band(1, self.astype(rasterio.float64))
+                dst.write_band(1, self.astype(dtype))
                 if self.mask.any():
                     dst.write_mask(255 * (~self.mask).astype('uint8'))
                 dst.close()
         return True
+
+        # with rasterio.open(filepath, 'w', **profile) as dst:
+        #     dst.write_band(1, self.astype(dtype))
+        #     if self.mask.any():
+        #         dst.write_mask(255 * (~self.mask).astype('uint8'))
+        #     dst.close()
 
     def masked_equal(self, value, copy=False):
         raster = self
@@ -358,7 +386,7 @@ class RectifiedGrid(SubRectifiedGrid, np.ma.core.MaskedArray):
         return raster
 
     # TODO deal nodata
-    def reproject(self, input_raster, resampling=RESAMPLING.bilinear, copy=False):
+    def reproject(self, input_raster, resampling=Resampling.bilinear, copy=False):
         """Reproject the input_raster using the current grid projection,
         resolution and extension
         """
@@ -381,9 +409,8 @@ class RectifiedGrid(SubRectifiedGrid, np.ma.core.MaskedArray):
         raster[:] = destination[:]
         return raster
 
-    def zoom(self, zoom, resampling=RESAMPLING.bilinear):
+    def zoom(self, zoom, resampling=Resampling.bilinear):
         res = self.resolution / zoom
-        print res
         rgrid = _geofactory(self.bounds, self.proj, res)
         return rgrid.reproject(self)
 
@@ -453,3 +480,15 @@ class RectifiedGrid(SubRectifiedGrid, np.ma.core.MaskedArray):
             plt.colorbar(mapimg, orientation='vertical', ax=ax)
 
         return m, mapimg
+
+    def griddata(self, x, y, z, method='nearest', copy=False):
+        raster = self
+        if copy:
+            raster = self.copy()
+        xi = np.arange(0.5, self.shape[1], 1.)
+        yi = np.arange(0.5, self.shape[0], 1.)
+        raster[:] = interpolate.griddata((x, y), z,
+                                         (xi[None, :], yi[:, None]),
+                                         method=method)
+        raster[np.isnan(raster)] = np.ma.masked
+        return raster
