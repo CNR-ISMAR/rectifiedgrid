@@ -315,7 +315,7 @@ class RectifiedGrid(SubRectifiedGrid, np.ma.core.MaskedArray):
                 d = self.data.copy()
                 d[self.mask] = nodata
 
-                dst.write_band(1, d.astype(rasterio.float64))
+                dst.write_band(1, d.astype(dtype))
             return True
 
         # with rasterio.drivers():
@@ -332,7 +332,6 @@ class RectifiedGrid(SubRectifiedGrid, np.ma.core.MaskedArray):
         #     if self.mask.any():
         #         dst.write_mask(255 * (~self.mask).astype('uint8'))
         #     dst.close()
-
 
     def masked_equal(self, value, copy=False):
         raster = self
