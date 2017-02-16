@@ -17,6 +17,7 @@ from shapely.geometry import box, Point
 from shapely import ops
 from rtree.index import Index as RTreeIndex
 from scipy import ndimage
+from scipy import interpolate
 from itertools import izip
 import matplotlib.pyplot as plt
 from matplotlib import colors
@@ -476,3 +477,15 @@ class RectifiedGrid(SubRectifiedGrid, np.ma.core.MaskedArray):
             plt.colorbar(mapimg, orientation='vertical', ax=ax)
 
         return m, mapimg
+
+    def griddata(self, x, y, z, method='nearest', copy=False):
+        raster = self
+        if copy:
+            raster = self.copy()
+        xi = np.arange(0.5, self.shape[1], 1.)
+        yi = np.arange(0.5, self.shape[0], 1.)
+        raster[:] = interpolate.griddata((x, y), z,
+                                         (xi[None, :], yi[:, None]),
+                                         method=method)
+        raster[np.isnan(raster)] = np.ma.masked
+        return raster
