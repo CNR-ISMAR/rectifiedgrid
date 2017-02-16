@@ -43,7 +43,7 @@ class TestInitialization(object):
         vector = os.path.join(GOOD_DATA, 'vector',
                               'san_andres_y_providencia_water.shp')
         grid = rg.read_vector(vector, 0.025, value=1, compute_area=True)
-        assert round(grid[0, 14], 3) == 0
+        assert round(grid[0, 14], 3) == 0.156
 
     def test_read_raster(self):
         raster = os.path.join(GOOD_DATA, 'raster',
