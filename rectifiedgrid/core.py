@@ -403,7 +403,7 @@ class RectifiedGrid(SubRectifiedGrid, np.ma.core.MaskedArray):
     def plotmap(self, legend=False, arcgis=False, coast=False, countries=False,
                 rivers=False, grid=False, bluemarble=False, etopo=False,
                 maptype=None, cmap=None, norm=None, logcolor=False, vmin=None,
-                vmax=None, ax=None):
+                vmax=None, ax=None, basemap=None):
 
         if maptype == 'minimal':
             coast = True,
@@ -415,7 +415,10 @@ class RectifiedGrid(SubRectifiedGrid, np.ma.core.MaskedArray):
             arcgis = True
             grid = True
 
-        m = self.get_basemap(ax=ax)
+        if basemap is None:
+            m = self.get_basemap(ax=ax)
+        else:
+            m = basemap
 
         if cmap is not None and isinstance(cmap, str):
             cmap = plt.get_cmap(cmap)
