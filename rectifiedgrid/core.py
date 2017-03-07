@@ -21,8 +21,12 @@ from scipy import interpolate
 from itertools import izip
 import matplotlib.pyplot as plt
 from matplotlib import colors
-from mpl_toolkits import basemap
-
+BASEMAP = False
+try:
+    from mpl_toolkits import basemap
+    BASEMAP = True
+except:
+    pass
 
 logger = logging.getLogger(__name__)
 
@@ -431,7 +435,8 @@ class RectifiedGrid(SubRectifiedGrid, np.ma.core.MaskedArray):
                 rivers=False, grid=False, bluemarble=False, etopo=False,
                 maptype=None, cmap=None, norm=None, logcolor=False, vmin=None,
                 vmax=None, ax=None, basemap=None):
-
+        if not BASEMAP:
+            raise ImportError("Cannot load mpl_toolkits module")
         if maptype == 'minimal':
             coast = True,
             countries = True
