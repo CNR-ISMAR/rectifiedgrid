@@ -294,7 +294,7 @@ class RectifiedGrid(SubRectifiedGrid, np.ma.core.MaskedArray):
             crs[k.replace('+', '')] = v
         return crs
 
-    def write_raster(self, filepath, dtype=None, driver='GTiff', nodata=None):
+    def write_raster(self, filepath, dtype=None, driver='GTiff', nodata=None, compress=None):
         """Write a raster file
         """
         count = 1
@@ -313,6 +313,9 @@ class RectifiedGrid(SubRectifiedGrid, np.ma.core.MaskedArray):
             'width': self.shape[1],
             'height': self.shape[0],
         }
+
+        if compress is not None:
+            profile['compress'] = compress
 
         if nodata is not None:
             profile['nodata'] = nodata
