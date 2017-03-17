@@ -34,6 +34,7 @@ logger = logging.getLogger(__name__)
 def read_vector(vector, res, column=None, value=1., compute_area=False,
                 dtype=np.float64, eea=False, epsg=None,
                 bounds=None, grid=None):
+    logger.debug('Reading vector as geodataframe')
     gdf = GeoDataFrame.from_file(vector)
     return read_df(gdf, res, column, value, compute_area,
                    dtype, eea, epsg, bounds, grid)
