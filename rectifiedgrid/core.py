@@ -33,16 +33,16 @@ logger = logging.getLogger(__name__)
 
 def read_vector(vector, res, column=None, value=1., compute_area=False,
                 dtype=np.float64, eea=False, epsg=None,
-                bounds=None, grid=None):
+                bounds=None, grid=None, all_touched=True):
     logger.debug('Reading vector as geodataframe')
     gdf = GeoDataFrame.from_file(vector)
     return read_df(gdf, res, column, value, compute_area,
-                   dtype, eea, epsg, bounds, grid)
+                   dtype, eea, epsg, bounds, grid, all_touched=all_touched)
 
 
 def read_df(gdf, res, column=None, value=1., compute_area=False,
             dtype=np.float64, eea=False, epsg=None, bounds=None,
-            grid=None):
+            grid=None, all_touched=True):
     if epsg is not None:
         gdf.to_crs(epsg=epsg, inplace=True)
         proj = parse_projection(epsg)
@@ -56,10 +56,12 @@ def read_df(gdf, res, column=None, value=1., compute_area=False,
     else:
         grid = grid.copy()
 
-    return read_df_like(grid, gdf, column, value, compute_area, copy=False)
+    return read_df_like(grid, gdf, column, value, compute_area, copy=False,
+                        all_touched=all_touched)
 
 
-def read_df_like(rgrid, gdf, column=None, value=1., compute_area=False, copy=True):
+def read_df_like(rgrid, gdf, column=None, value=1., compute_area=False,
+                 copy=True, all_touched=True):
     """
     quando e' presente sia column che value il value viene utilizzato per riempire gli nan
     """
@@ -74,11 +76,12 @@ def read_df_like(rgrid, gdf, column=None, value=1., compute_area=False, copy=Tru
     features = list(gdf[['geometry', '__rvalue__']].itertuples(index=False,
                                                                name=None))
 
-    return read_features_like(rgrid, features, compute_area=compute_area, copy=copy)
+    return read_features_like(rgrid, features, compute_area=compute_area,
+                              copy=copy, all_touched=all_touched)
 
 
 def read_features(features, res, crs, bounds=None, compute_area=False,
-                  dtype=np.float64, eea=False):
+                  dtype=np.float64, eea=False, all_touched=True):
     proj = parse_projection(crs)
     # guess bounds
     if bounds is None:
@@ -88,10 +91,11 @@ def read_features(features, res, crs, bounds=None, compute_area=False,
             b = np.array([feature[0].bounds for feature in features])
             bounds = np.min(b[:,0]), np.min(b[:,1]), np.max(b[:,2]), np.max(b[:,3])
     rgrid = _geofactory(bounds, proj, res, dtype, eea)
-    return read_features_like(rgrid, features, compute_area, copy=False)
+    return read_features_like(rgrid, features, compute_area, copy=False,
+                              all_touched=all_touched)
 
 
-def read_features_like(rgrid, features, compute_area=False, copy=True):
+def read_features_like(rgrid, features, compute_area=False, copy=True, all_touched=True):
     if copy:
         raster = rgrid.copy()
     else:
@@ -100,7 +104,7 @@ def read_features_like(rgrid, features, compute_area=False, copy=True):
     if compute_area:
         raster.rasterize_features_area(features)
     else:
-        raster.rasterize_features(features)
+        raster.rasterize_features(features, all_touched=all_touched)
     return raster
 
 
@@ -193,14 +197,14 @@ class RectifiedGrid(SubRectifiedGrid, np.ma.core.MaskedArray):
         """Area of a grid cell"""
         return self.resolution * self.resolution
 
-    def rasterize_features(self, features, mode='replace'):
+    def rasterize_features(self, features, mode='replace', all_touched=True):
         """
         """
         _array = rasterize(features,
                             fill=0,
                             transform=self.gtransform,
                             out_shape=self.shape,
-                            all_touched=True)
+                            all_touched=all_touched)
         if mode == 'replace':
             self[:] = _array
         elif mode == 'patch':
