@@ -13,6 +13,8 @@ try:
     from rasterio.warp import RESAMPLING as Resampling
 except:
     from rasterio.enums import Resampling
+from rasterio.warp import calculate_default_transform
+
 from shapely.geometry import box, Point
 from shapely import ops
 from rtree.index import Index as RTreeIndex
@@ -165,6 +167,27 @@ class SubRectifiedGrid(np.ndarray):
         self.proj = copy.deepcopy(getattr(obj, 'proj', None))
         self.gtransform = copy.deepcopy(getattr(obj, 'gtransform', None))
         return
+
+    def __getitem__(self, *args, **kwargs):
+        rslice = None
+        cslice = None
+        if isinstance(args[0], slice):
+            rslice = args[0]
+            cslice = slice(None, None, None)
+        if isinstance(args[0], tuple) and isinstance(args[0][0], slice) and isinstance(args[0][1], slice):
+            rslice, cslice = args[0]
+        obj = super(SubRectifiedGrid, self).__getitem__(*args, **kwargs)
+        rstart = 0
+        cstart = 0
+        if rslice is not None and rslice.start is not None:
+            rstart = rslice.start
+        if cslice is not None and cslice.start is not None:
+            cstart = cslice.start
+        if rstart > 0 or cstart > 0:
+            g = obj.gtransform
+            xmax, ymax = g * [cstart, rstart]
+            obj.gtransform = Affine(g.a, g.b, xmax, g.d, g.e, ymax)
+        return obj
 
     # def __add__(self, other):
     #     result = super(SubRectifiedGrid, self).__add__(other)
@@ -396,6 +419,55 @@ class RectifiedGrid(SubRectifiedGrid, np.ma.core.MaskedArray):
         if sigma > 0:
             raster[:] = ndimage.gaussian_filter(raster, sigma, mode=mode, **kwargs)
         return raster
+
+    def fill_underlying_data(self, fill_value=None):
+        self.data[:] = self.filled(fill_value)
+
+    def to_srs_like(self, rgrid, src_nodata=None, dst_nodata=None,
+                    resampling=Resampling.bilinear):
+        if src_nodata is None:
+            src_nodata = self.fill_value
+        if dst_nodata is None:
+            dst_nodata = rgrid.fill_value
+        print src_nodata, dst_nodata
+        # TODO: actually this modify the original data
+        self.fill_underlying_data(src_nodata)
+
+        # dst_shape = rgrid.shape
+        dst_transform = rgrid.gtransform
+        dst_crs = rgrid.crs
+        destination = rgrid.astype(self.dtype).copy()
+        reproject(
+            self.copy(),
+            destination=destination,
+            src_transform=self.gtransform,
+            src_nodata=src_nodata,
+            src_crs=self.crs,
+            dst_transform=dst_transform,
+            dst_crs=dst_crs,
+            resampling=resampling,
+            dst_nodata=dst_nodata)
+
+        destination.masked_equal(dst_nodata)
+        return destination
+
+    def to_srs(self, srs, resolution=None, src_nodata=None, dst_nodata=None,
+               resampling=Resampling.nearest):
+        affine, width, height = calculate_default_transform(self.crs,
+                                                            srs,
+                                                            self.shape[1],
+                                                            self.shape[0],
+                                                            *self.bounds,
+                                                            resolution=resolution)
+        if dst_nodata is None:
+            dst_nodata = self.fill_value
+
+        destination = RectifiedGrid(np.zeros([height, width], self.dtype),
+                                    srs,
+                                    affine,
+                                    fill_value=dst_nodata)
+        return self.to_srs_like(destination, src_nodata,
+                                dst_nodata, resampling)
 
     # TODO deal nodata
     def reproject(self, input_raster, resampling=Resampling.bilinear, copy=False):
