@@ -3,6 +3,8 @@ import math
 from shapely import ops
 from functools import partial
 from rasterio.crs import CRS
+from matplotlib.colors import LinearSegmentedColormap, from_levels_and_colors
+from os.path import exists
 
 EEA_GRID_RESOLUTIONS = [25, 100, 250, 500, 1000, 2500, 10000, 25000, 100000]
 
@@ -59,3 +61,23 @@ def transform(g, from_srs, to_srs):
         parse_projection(to_srs))
 
     return ops.transform(project, g)
+
+
+def read_color_table(color_file):
+    '''
+    The method for reading the color file.
+    '''
+    colors = []
+    levels = []
+    if exists(color_file) is False:
+        raise Exception("Color file " + color_file + " does not exist")
+    fp = open(color_file, "r")
+    for line in fp:
+        if line.find('#') == -1 and line.find('/') == -1:
+            entry = line.split()
+            levels.append(eval(entry[0]))
+            colors.append((int(entry[1])/255.,int(entry[2])/255.,int(entry[3])/255.))
+    fp.close()
+    # cmap = LinearSegmentedColormap.from_list("my_colormap", colors, N=len(levels), gamma=1.0)
+    # return levels, cmap
+    return from_levels_and_colors(levels, colors, extend='min')
