@@ -19,7 +19,7 @@ Coastal Management and Maritime Spatial Planning analyses.
 Usage
 =====
 
-# Ndvi
+## Ndvi calculation
 
 
 ```python
