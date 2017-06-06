@@ -15,6 +15,26 @@ data through OGC interoperable services.
 RectifiedGrid has been initialy developed to support Integrated
 Coastal Management and Maritime Spatial Planning analyses.
 
+
+Usage
+=====
+
+# Ndvi
+
+
+```python
+import rectifiedgrid as rg
+
+b4 = rg.read_raster('test/data/b04.tiff', masked=True)
+b8 = rg.read_raster('test/data/b08.tiff', masked=True)
+
+ndvi = (b8.astype(float) - b4.astype(float))/(b8.astype(float) + b4.astype(float))
+ndvi.plotmap(cmap=cmap_ndvi, legend=True, vmin=-1, vmax=1)
+```
+
+![Alt text](/docs/image/ndvi.png?raw=true "Ndvi example")
+
+
 How to Cite
 ===========
 Please, when you use rectifiedgrid cite as:
