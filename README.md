@@ -19,7 +19,7 @@ Coastal Management and Maritime Spatial Planning analyses.
 Usage
 =====
 
-### Reading a GeoTIFF
+### Reading and plot GeoTIFF 
 
 ```python
 import rectifiedgrid as rg
@@ -29,8 +29,19 @@ grid.plotmap()
 
 ![Alt text](/docs/images/adriatic_ionian_grid.png?raw=true "Adriatic Ionian Grid")
 
+### Plotting options
 
-### Ndvi calculation
+RectifiedGrid wraps Matplotlib Basemap Toolkit functions.
+
+```python
+grid.plotmap(rivers=True, countries=True,
+             grid=True, coast=True)
+```
+
+![Alt text](/docs/images/distances.png?raw=true "Plotting options")
+
+
+### Map algebra: Ndvi calculation
 
 ```python
 import rectifiedgrid as rg
@@ -44,6 +55,28 @@ ndvi.plotmap(cmap=cmap_ndvi, legend=True, vmin=-1, vmax=1)
 
 ![Alt text](/docs/images/ndvi.png?raw=true "Ndvi example")
 
+
+### Wrapping array-wise functions: distance from coast
+
+RectifiedGrid implements a function wrapper (wrap_func) to apply
+array-wise functions.
+
+In this example we use the distance_transform_bf (from
+scipy.ndimage,morphology) to calculate the distance from the coast for
+the Adriatic-Inonian region.
+
+```python
+from scipy.ndimage.morphology import distance_transform_bf
+distances = grid.wrap_func(distance_transform_bf)
+
+# plotting
+plt.figure(figsize=[10, 8])
+distances.plotmap(rivers=True, countries=True,
+             grid=True, coast=True, legend=True)
+
+```
+
+![Alt text](/docs/images/distances.png?raw=true "Distances example")
 
 How to Cite
 ===========
