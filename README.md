@@ -32,7 +32,7 @@ ndvi = (b8.astype(float) - b4.astype(float))/(b8.astype(float) + b4.astype(float
 ndvi.plotmap(cmap=cmap_ndvi, legend=True, vmin=-1, vmax=1)
 ```
 
-![Alt text](/docs/image/ndvi.png?raw=true "Ndvi example")
+![Alt text](/docs/images/ndvi.png?raw=true "Ndvi example")
 
 
 How to Cite
