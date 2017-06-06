@@ -1,10 +1,11 @@
+import pandas as pd
 import pyproj
 import math
 from shapely import ops
 from functools import partial
 from rasterio.crs import CRS
-from matplotlib.colors import LinearSegmentedColormap, from_levels_and_colors
-from os.path import exists
+from matplotlib.colors import LinearSegmentedColormap
+
 
 EEA_GRID_RESOLUTIONS = [25, 100, 250, 500, 1000, 2500, 10000, 25000, 100000]
 
@@ -63,21 +64,15 @@ def transform(g, from_srs, to_srs):
     return ops.transform(project, g)
 
 
-def read_color_table(color_file):
-    '''
-    The method for reading the color file.
-    '''
-    colors = []
-    levels = []
-    if exists(color_file) is False:
-        raise Exception("Color file " + color_file + " does not exist")
-    fp = open(color_file, "r")
-    for line in fp:
-        if line.find('#') == -1 and line.find('/') == -1:
-            entry = line.split()
-            levels.append(eval(entry[0]))
-            colors.append((int(entry[1])/255.,int(entry[2])/255.,int(entry[3])/255.))
-    fp.close()
-    # cmap = LinearSegmentedColormap.from_list("my_colormap", colors, N=len(levels), gamma=1.0)
-    # return levels, cmap
-    return from_levels_and_colors(levels, colors, extend='min')
+def read_color_table(color_file, cmap_name='newcmap'):
+    df = pd.read_table(color_file, sep='\s+',
+                       header=None, names=['value', 'r', 'g', 'b'],
+                       comment='#')
+    value_norm =  (df.value - df.value.min()) / (df.value.max() - df.value.min())
+    df.loc[:, 'value'] = value_norm
+
+    levels_colors = zip(df.value, zip(df.r/255, df.g/255, df.b/255))
+    print levels_colors
+    return LinearSegmentedColormap.from_list(cmap_name,
+                                             levels_colors,
+                                             gamma=1.0)
