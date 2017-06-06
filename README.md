@@ -19,8 +19,18 @@ Coastal Management and Maritime Spatial Planning analyses.
 Usage
 =====
 
-## Ndvi calculation
+### Reading a GeoTIFF
 
+```python
+import rectifiedgrid as rg
+grid = rg.read_raster('test/data/adriatic_ionian.tiff', masked=True)
+grid.plotmap()
+```
+
+![Alt text](/docs/images/adriatic_ionian_grid.png?raw=true "Adriatic Ionian Grid")
+
+
+### Ndvi calculation
 
 ```python
 import rectifiedgrid as rg
