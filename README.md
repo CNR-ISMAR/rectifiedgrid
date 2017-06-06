@@ -38,7 +38,7 @@ grid.plotmap(rivers=True, countries=True,
              grid=True, coast=True)
 ```
 
-![Alt text](/docs/images/distances.png?raw=true "Plotting options")
+![Alt text](/docs/images/plot_options.png?raw=true "Plotting options")
 
 
 ### Map algebra: Ndvi calculation
