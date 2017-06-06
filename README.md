@@ -49,7 +49,7 @@ import rectifiedgrid as rg
 b4 = rg.read_raster('test/data/b04.tiff', masked=True)
 b8 = rg.read_raster('test/data/b08.tiff', masked=True)
 
-ndvi = (b8.astype(float) - b4.astype(float))/(b8.astype(float) + b4.astype(float))
+ndvi = (b8 - b4)/(b8 + b4)
 ndvi.plotmap(cmap=cmap_ndvi, legend=True, vmin=-1, vmax=1)
 ```
 
