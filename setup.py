@@ -28,7 +28,7 @@ setup(
 
         # vector data utils
         'shapely',
-        'rtree',
+        'rtree==0.8.3',
 
         # utils
         'affine'
