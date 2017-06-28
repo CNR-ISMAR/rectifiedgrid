@@ -7,7 +7,7 @@ def read(fname):
 
 setup(
     name = "rectifiedgrid", # or RectifiedGrid
-    version = "0.2.0",
+    version = "1.0.0-beta.1",
     author = "Stefano Menegon",
     author_email = "ste.menegon@gmail.com",
     description = ("RectifiedGrid is a python module to deal with rectified grid."),
@@ -28,13 +28,13 @@ setup(
 
         # vector data utils
         'shapely',
-        'rtree',
+        'rtree==0.8.3',
 
         # utils
         'affine'
     ],
     classifiers=[
-        "Development Status :: 3 - Alpha",
+        "Development Status :: 4 - Beta",
         "Topic :: Utilities",
         "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
     ]

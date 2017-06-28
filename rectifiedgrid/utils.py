@@ -1,8 +1,11 @@
+import pandas as pd
 import pyproj
 import math
 from shapely import ops
 from functools import partial
 from rasterio.crs import CRS
+from matplotlib.colors import LinearSegmentedColormap
+
 
 EEA_GRID_RESOLUTIONS = [25, 100, 250, 500, 1000, 2500, 10000, 25000, 100000]
 
@@ -59,3 +62,17 @@ def transform(g, from_srs, to_srs):
         parse_projection(to_srs))
 
     return ops.transform(project, g)
+
+
+def read_color_table(color_file, cmap_name='newcmap'):
+    df = pd.read_table(color_file, sep='\s+',
+                       header=None, names=['value', 'r', 'g', 'b'],
+                       comment='#')
+    value_norm =  (df.value - df.value.min()) / (df.value.max() - df.value.min())
+    df.loc[:, 'value'] = value_norm
+
+    levels_colors = zip(df.value, zip(df.r/255, df.g/255, df.b/255))
+    print levels_colors
+    return LinearSegmentedColormap.from_list(cmap_name,
+                                             levels_colors,
+                                             gamma=1.0)

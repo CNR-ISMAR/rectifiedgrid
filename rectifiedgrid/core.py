@@ -13,6 +13,8 @@ try:
     from rasterio.warp import RESAMPLING as Resampling
 except:
     from rasterio.enums import Resampling
+from rasterio.warp import calculate_default_transform
+
 from shapely.geometry import box, Point
 from shapely import ops
 from rtree.index import Index as RTreeIndex
@@ -21,23 +23,28 @@ from scipy import interpolate
 from itertools import izip
 import matplotlib.pyplot as plt
 from matplotlib import colors
-from mpl_toolkits import basemap
-
+BASEMAP = False
+try:
+    from mpl_toolkits import basemap
+    BASEMAP = True
+except:
+    pass
 
 logger = logging.getLogger(__name__)
 
 
 def read_vector(vector, res, column=None, value=1., compute_area=False,
                 dtype=np.float64, eea=False, epsg=None,
-                bounds=None, grid=None):
+                bounds=None, grid=None, all_touched=True):
+    logger.debug('Reading vector as geodataframe')
     gdf = GeoDataFrame.from_file(vector)
     return read_df(gdf, res, column, value, compute_area,
-                   dtype, eea, epsg, bounds, grid)
+                   dtype, eea, epsg, bounds, grid, all_touched=all_touched)
 
 
 def read_df(gdf, res, column=None, value=1., compute_area=False,
             dtype=np.float64, eea=False, epsg=None, bounds=None,
-            grid=None):
+            grid=None, all_touched=True):
     if epsg is not None:
         gdf.to_crs(epsg=epsg, inplace=True)
         proj = parse_projection(epsg)
@@ -51,10 +58,12 @@ def read_df(gdf, res, column=None, value=1., compute_area=False,
     else:
         grid = grid.copy()
 
-    return read_df_like(grid, gdf, column, value, compute_area, copy=False)
+    return read_df_like(grid, gdf, column, value, compute_area, copy=False,
+                        all_touched=all_touched)
 
 
-def read_df_like(rgrid, gdf, column=None, value=1., compute_area=False, copy=True):
+def read_df_like(rgrid, gdf, column=None, value=1., compute_area=False,
+                 copy=True, all_touched=True):
     """
     quando e' presente sia column che value il value viene utilizzato per riempire gli nan
     """
@@ -69,11 +78,12 @@ def read_df_like(rgrid, gdf, column=None, value=1., compute_area=False, copy=Tru
     features = list(gdf[['geometry', '__rvalue__']].itertuples(index=False,
                                                                name=None))
 
-    return read_features_like(rgrid, features, compute_area=compute_area, copy=copy)
+    return read_features_like(rgrid, features, compute_area=compute_area,
+                              copy=copy, all_touched=all_touched)
 
 
 def read_features(features, res, crs, bounds=None, compute_area=False,
-                  dtype=np.float64, eea=False):
+                  dtype=np.float64, eea=False, all_touched=True):
     proj = parse_projection(crs)
     # guess bounds
     if bounds is None:
@@ -83,10 +93,11 @@ def read_features(features, res, crs, bounds=None, compute_area=False,
             b = np.array([feature[0].bounds for feature in features])
             bounds = np.min(b[:,0]), np.min(b[:,1]), np.max(b[:,2]), np.max(b[:,3])
     rgrid = _geofactory(bounds, proj, res, dtype, eea)
-    return read_features_like(rgrid, features, compute_area, copy=False)
+    return read_features_like(rgrid, features, compute_area, copy=False,
+                              all_touched=all_touched)
 
 
-def read_features_like(rgrid, features, compute_area=False, copy=True):
+def read_features_like(rgrid, features, compute_area=False, copy=True, all_touched=True):
     if copy:
         raster = rgrid.copy()
     else:
@@ -95,7 +106,7 @@ def read_features_like(rgrid, features, compute_area=False, copy=True):
     if compute_area:
         raster.rasterize_features_area(features)
     else:
-        raster.rasterize_features(features)
+        raster.rasterize_features(features, all_touched=all_touched)
     return raster
 
 
@@ -157,6 +168,27 @@ class SubRectifiedGrid(np.ndarray):
         self.gtransform = copy.deepcopy(getattr(obj, 'gtransform', None))
         return
 
+    def __getitem__(self, *args, **kwargs):
+        rslice = None
+        cslice = None
+        if isinstance(args[0], slice):
+            rslice = args[0]
+            cslice = slice(None, None, None)
+        if isinstance(args[0], tuple) and isinstance(args[0][0], slice) and isinstance(args[0][1], slice):
+            rslice, cslice = args[0]
+        obj = super(SubRectifiedGrid, self).__getitem__(*args, **kwargs)
+        rstart = 0
+        cstart = 0
+        if rslice is not None and rslice.start is not None:
+            rstart = rslice.start
+        if cslice is not None and cslice.start is not None:
+            cstart = cslice.start
+        if rstart > 0 or cstart > 0:
+            g = obj.gtransform
+            xmax, ymax = g * [cstart, rstart]
+            obj.gtransform = Affine(g.a, g.b, xmax, g.d, g.e, ymax)
+        return obj
+
     # def __add__(self, other):
     #     result = super(SubRectifiedGrid, self).__add__(other)
     #     result.info['added'] = result.info.get('added', 0) + 1
@@ -188,14 +220,14 @@ class RectifiedGrid(SubRectifiedGrid, np.ma.core.MaskedArray):
         """Area of a grid cell"""
         return self.resolution * self.resolution
 
-    def rasterize_features(self, features, mode='replace'):
+    def rasterize_features(self, features, mode='replace', all_touched=True):
         """
         """
         _array = rasterize(features,
                             fill=0,
                             transform=self.gtransform,
                             out_shape=self.shape,
-                            all_touched=True)
+                            all_touched=all_touched)
         if mode == 'replace':
             self[:] = _array
         elif mode == 'patch':
@@ -290,7 +322,7 @@ class RectifiedGrid(SubRectifiedGrid, np.ma.core.MaskedArray):
             crs[k.replace('+', '')] = v
         return crs
 
-    def write_raster(self, filepath, dtype=None, driver='GTiff', nodata=None):
+    def write_raster(self, filepath, dtype=None, driver='GTiff', nodata=None, compress=None):
         """Write a raster file
         """
         count = 1
@@ -309,6 +341,9 @@ class RectifiedGrid(SubRectifiedGrid, np.ma.core.MaskedArray):
             'width': self.shape[1],
             'height': self.shape[0],
         }
+
+        if compress is not None:
+            profile['compress'] = compress
 
         if nodata is not None:
             profile['nodata'] = nodata
@@ -387,6 +422,55 @@ class RectifiedGrid(SubRectifiedGrid, np.ma.core.MaskedArray):
             raster[:] = ndimage.gaussian_filter(raster, sigma, mode=mode, **kwargs)
         return raster
 
+    def fill_underlying_data(self, fill_value=None):
+        self.data[:] = self.filled(fill_value)
+
+    def to_srs_like(self, rgrid, src_nodata=None, dst_nodata=None,
+                    resampling=Resampling.bilinear):
+        if src_nodata is None:
+            src_nodata = self.fill_value
+        if dst_nodata is None:
+            dst_nodata = rgrid.fill_value
+        print src_nodata, dst_nodata
+        # TODO: actually this modify the original data
+        self.fill_underlying_data(src_nodata)
+
+        # dst_shape = rgrid.shape
+        dst_transform = rgrid.gtransform
+        dst_crs = rgrid.crs
+        destination = rgrid.astype(self.dtype).copy()
+        reproject(
+            self.copy(),
+            destination=destination,
+            src_transform=self.gtransform,
+            src_nodata=src_nodata,
+            src_crs=self.crs,
+            dst_transform=dst_transform,
+            dst_crs=dst_crs,
+            resampling=resampling,
+            dst_nodata=dst_nodata)
+
+        destination.masked_equal(dst_nodata)
+        return destination
+
+    def to_srs(self, srs, resolution=None, src_nodata=None, dst_nodata=None,
+               resampling=Resampling.nearest):
+        affine, width, height = calculate_default_transform(self.crs,
+                                                            srs,
+                                                            self.shape[1],
+                                                            self.shape[0],
+                                                            *self.bounds,
+                                                            resolution=resolution)
+        if dst_nodata is None:
+            dst_nodata = self.fill_value
+
+        destination = RectifiedGrid(np.zeros([height, width], self.dtype),
+                                    srs,
+                                    affine,
+                                    fill_value=dst_nodata)
+        return self.to_srs_like(destination, src_nodata,
+                                dst_nodata, resampling)
+
     # TODO deal nodata
     def reproject(self, input_raster, resampling=Resampling.bilinear, copy=False):
         """Reproject the input_raster using the current grid projection,
@@ -433,7 +517,8 @@ class RectifiedGrid(SubRectifiedGrid, np.ma.core.MaskedArray):
                 rivers=False, grid=False, bluemarble=False, etopo=False,
                 maptype=None, cmap=None, norm=None, logcolor=False, vmin=None,
                 vmax=None, ax=None, basemap=None):
-
+        if not BASEMAP:
+            raise ImportError("Cannot load mpl_toolkits module")
         if maptype == 'minimal':
             coast = True,
             countries = True
