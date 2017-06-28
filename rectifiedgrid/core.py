@@ -374,7 +374,9 @@ class RectifiedGrid(SubRectifiedGrid, np.ma.core.MaskedArray):
         raster = self
         if copy:
             raster = self.copy()
-        raster[:] = (raster / raster.max())[:]
+        max = raster.max()
+        if max != 0:
+            raster[:] = (raster / max)[:]
         return raster
 
     def gaussian_filter(self, sigma, mode="constant", copy=False, **kwargs):
