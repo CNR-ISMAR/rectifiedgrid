@@ -110,7 +110,7 @@ def read_features_like(rgrid, features, compute_area=False, copy=True, all_touch
     return raster
 
 
-def read_raster(raster, masked=False):
+def read_raster(raster, masked=True):
     src = rasterio.open(raster)
     if src.count > 1:
         src.close()
@@ -383,6 +383,30 @@ class RectifiedGrid(SubRectifiedGrid, np.ma.core.MaskedArray):
         raster[:] = np.ma.masked_values(raster, value)
         return raster
 
+    def masked_greater_equal(self, value, copy=False, **kwargs):
+        raster = self
+        if copy:
+            raster = self.copy()
+        raster[:] = np.ma.masked_greater_equal(raster, value, **kwargs)
+        return raster
+
+    def masked_less_equal(self, value, copy=False, **kwargs):
+        raster = self
+        if copy:
+            raster = self.copy()
+        raster[:] = np.ma.masked_less_equal(raster, value, **kwargs)
+        return raster
+
+    def threshold_binary(self, threshold, equal=False, copy=False):
+        raster = self
+        if copy:
+            raster = self.copy()
+        if equal:
+            raster[:] = raster >= threshold
+        else:
+            raster[:] = raster > threshold
+        return raster
+
     def positive(self, copy=False):
         raster = self
         if copy:
@@ -514,7 +538,7 @@ class RectifiedGrid(SubRectifiedGrid, np.ma.core.MaskedArray):
             epsg=epsg, ax=ax)
 
     def plotmap(self, legend=False, arcgis=False, coast=False, countries=False,
-                rivers=False, grid=False, bluemarble=False, etopo=False,
+                rivers=False, grid=False, gridrange=2, bluemarble=False, etopo=False,
                 maptype=None, cmap=None, norm=None, logcolor=False, vmin=None,
                 vmax=None, ax=None, basemap=None):
         if not BASEMAP:
@@ -561,8 +585,8 @@ class RectifiedGrid(SubRectifiedGrid, np.ma.core.MaskedArray):
         if rivers:
             m.drawrivers(linewidth=0.2, linestyle='solid', color='b')
         if grid:
-            m.drawparallels(np.arange(-90,90,2),labels=[1,0,0,0],fontsize=10)
-            m.drawmeridians(np.arange(-90,90,2),labels=[0,0,0,1],fontsize=10)
+            m.drawparallels(np.arange(-90,90,gridrange),labels=[1,0,0,0],fontsize=10)
+            m.drawmeridians(np.arange(-90,90,gridrange),labels=[0,0,0,1],fontsize=10)
         if legend:
             plt.colorbar(mapimg, orientation='vertical', ax=ax)
 
