@@ -35,16 +35,17 @@ logger = logging.getLogger(__name__)
 
 def read_vector(vector, res, column=None, value=1., compute_area=False,
                 dtype=np.float64, eea=False, epsg=None,
-                bounds=None, grid=None, all_touched=True):
+                bounds=None, grid=None, all_touched=True, fillvalue=0.):
     logger.debug('Reading vector as geodataframe')
     gdf = GeoDataFrame.from_file(vector)
     return read_df(gdf, res, column, value, compute_area,
-                   dtype, eea, epsg, bounds, grid, all_touched=all_touched)
+                   dtype, eea, epsg, bounds, grid,
+                   all_touched=all_touched, fillvalue=fillvalue)
 
 
 def read_df(gdf, res, column=None, value=1., compute_area=False,
             dtype=np.float64, eea=False, epsg=None, bounds=None,
-            grid=None, all_touched=True):
+            grid=None, all_touched=True, fillvalue=0.):
     if epsg is not None:
         gdf.to_crs(epsg=epsg, inplace=True)
         proj = parse_projection(epsg)
@@ -59,20 +60,19 @@ def read_df(gdf, res, column=None, value=1., compute_area=False,
         grid = grid.copy()
 
     return read_df_like(grid, gdf, column, value, compute_area, copy=False,
-                        all_touched=all_touched)
+                        all_touched=all_touched, fillvalue=fillvalue)
 
 
 def read_df_like(rgrid, gdf, column=None, value=1., compute_area=False,
-                 copy=True, all_touched=True):
+                 copy=True, all_touched=True, fillvalue=0.):
     """
-    quando e' presente sia column che value il value viene utilizzato per riempire gli nan
     """
     if column is not None:
         gdf = gdf.rename(columns={column: '__rvalue__'})
     else:
         gdf['__rvalue__'] = value
 
-    gdf.__rvalue__ = gdf.__rvalue__.fillna(value)
+    gdf.__rvalue__ = gdf.__rvalue__.fillna(fillvalue)
     gdf.to_crs(crs=rgrid.crs, inplace=True)
 
     features = list(gdf[['geometry', '__rvalue__']].itertuples(index=False,
@@ -397,7 +397,7 @@ class RectifiedGrid(SubRectifiedGrid, np.ma.core.MaskedArray):
         raster[:] = np.ma.masked_less_equal(raster, value, **kwargs)
         return raster
 
-    def threshold_binary(self, threshold, equal=False, copy=False):
+    def threshold_binary(self, threshold=0, equal=False, copy=False):
         raster = self
         if copy:
             raster = self.copy()
