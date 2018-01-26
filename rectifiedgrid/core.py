@@ -246,12 +246,10 @@ class RectifiedGrid(SubRectifiedGrid, np.ma.core.MaskedArray):
         np.maximum(self, array, self)
 
     def rasterize_features_area(self, features):
-        self.rasterize_features(features)
+        self.rasterize_features(features, all_touched=True)
         boundary = self - ndimage.binary_erosion(self)
-
         if len(features) != 1:
             # create a spatialindex
-            print "create spatial index"
             stream = ((i, geo.bounds, value) for i, (geo, value) in
                       enumerate(features))
             sindex = RTreeIndex(stream)
@@ -429,7 +427,6 @@ class RectifiedGrid(SubRectifiedGrid, np.ma.core.MaskedArray):
             src_nodata = self.fill_value
         if dst_nodata is None:
             dst_nodata = rgrid.fill_value
-        print src_nodata, dst_nodata
         # TODO: actually this modify the original data
         self.fill_underlying_data(src_nodata)
 
@@ -576,4 +573,12 @@ class RectifiedGrid(SubRectifiedGrid, np.ma.core.MaskedArray):
                                          (xi[None, :], yi[:, None]),
                                          method=method)
         raster[np.isnan(raster)] = np.ma.masked
+        return raster
+
+    def wrap_func(self, f, *args, **kwargs):
+        # TODO: deal with type (the f could change the type)
+        # TODO
+        raster = self.copy()
+        raster[:] = f(raster, *args, **kwargs)
+        raster.mask = self.mask.copy()
         return raster

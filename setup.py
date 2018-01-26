@@ -17,14 +17,15 @@ setup(
     packages=['rectifiedgrid'],
     # long_description=read('README'),
     install_requires = [
-        # I/O
-        'rasterio',
-        'fiona',
-
         # data structures and analyses
         'numpy',
         'geopandas',
         'scipy',
+
+        # I/O
+        'rasterio',
+        'fiona',
+
 
         # vector data utils
         'shapely',
