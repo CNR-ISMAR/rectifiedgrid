@@ -23,7 +23,10 @@ from scipy import interpolate
 from itertools import izip
 import matplotlib.pyplot as plt
 from matplotlib import colors
+from matplotlib.ticker import LogFormatter
+
 BASEMAP = False
+
 try:
     from mpl_toolkits import basemap
     BASEMAP = True
@@ -35,16 +38,17 @@ logger = logging.getLogger(__name__)
 
 def read_vector(vector, res, column=None, value=1., compute_area=False,
                 dtype=np.float64, eea=False, epsg=None,
-                bounds=None, grid=None, all_touched=True):
+                bounds=None, grid=None, all_touched=True, fillvalue=0.):
     logger.debug('Reading vector as geodataframe')
     gdf = GeoDataFrame.from_file(vector)
     return read_df(gdf, res, column, value, compute_area,
-                   dtype, eea, epsg, bounds, grid, all_touched=all_touched)
+                   dtype, eea, epsg, bounds, grid,
+                   all_touched=all_touched, fillvalue=fillvalue)
 
 
 def read_df(gdf, res, column=None, value=1., compute_area=False,
             dtype=np.float64, eea=False, epsg=None, bounds=None,
-            grid=None, all_touched=True):
+            grid=None, all_touched=True, fillvalue=0.):
     if epsg is not None:
         gdf.to_crs(epsg=epsg, inplace=True)
         proj = parse_projection(epsg)
@@ -59,20 +63,19 @@ def read_df(gdf, res, column=None, value=1., compute_area=False,
         grid = grid.copy()
 
     return read_df_like(grid, gdf, column, value, compute_area, copy=False,
-                        all_touched=all_touched)
+                        all_touched=all_touched, fillvalue=fillvalue)
 
 
 def read_df_like(rgrid, gdf, column=None, value=1., compute_area=False,
-                 copy=True, all_touched=True):
+                 copy=True, all_touched=True, fillvalue=0.):
     """
-    quando e' presente sia column che value il value viene utilizzato per riempire gli nan
     """
     if column is not None:
         gdf = gdf.rename(columns={column: '__rvalue__'})
     else:
         gdf['__rvalue__'] = value
 
-    gdf.__rvalue__ = gdf.__rvalue__.fillna(value)
+    gdf.__rvalue__ = gdf.__rvalue__.fillna(fillvalue)
     gdf.to_crs(crs=rgrid.crs, inplace=True)
 
     features = list(gdf[['geometry', '__rvalue__']].itertuples(index=False,
@@ -110,7 +113,7 @@ def read_features_like(rgrid, features, compute_area=False, copy=True, all_touch
     return raster
 
 
-def read_raster(raster, masked=False):
+def read_raster(raster, masked=True):
     src = rasterio.open(raster)
     if src.count > 1:
         src.close()
@@ -164,21 +167,34 @@ class SubRectifiedGrid(np.ndarray):
         if callable(getattr(super(SubRectifiedGrid, self),
                             '__array_finalize__', None)):
             super(SubRectifiedGrid, self).__array_finalize__(obj)
+
         self.proj = copy.deepcopy(getattr(obj, 'proj', None))
         self.gtransform = copy.deepcopy(getattr(obj, 'gtransform', None))
+        # self.proj = getattr(obj, 'proj', None)
+        # self.gtransform = getattr(obj, 'gtransform', None)
         return
+
+    def copy(self, *args, **kwargs):
+        obj = super(SubRectifiedGrid, self).copy(*args, **kwargs)
+        obj.proj = copy.deepcopy(getattr(self, 'proj', None))
+        obj.gtransform = copy.deepcopy(getattr(self, 'gtransform', None))
+        return obj
 
     def __getitem__(self, *args, **kwargs):
         rslice = None
         cslice = None
+        rstart = 0
+        cstart = 0
         if isinstance(args[0], slice):
             rslice = args[0]
             cslice = slice(None, None, None)
-        if isinstance(args[0], tuple) and isinstance(args[0][0], slice) and isinstance(args[0][1], slice):
-            rslice, cslice = args[0]
+        if isinstance(args[0], tuple) and len(args[0]) == 2:
+            if isinstance(args[0], tuple) and isinstance(args[0][0], slice) and isinstance(args[0][1], slice):
+                rslice, cslice = args[0]
+            if isinstance(args[0], tuple) and isinstance(args[0][0], np.ndarray) and isinstance(args[0][1], np.ndarray):
+                rstart = args[0][0].min()
+                cstart = args[0][1].min()
         obj = super(SubRectifiedGrid, self).__getitem__(*args, **kwargs)
-        rstart = 0
-        cstart = 0
         if rslice is not None and rslice.start is not None:
             rstart = rslice.start
         if cslice is not None and cslice.start is not None:
@@ -187,6 +203,7 @@ class SubRectifiedGrid(np.ndarray):
             g = obj.gtransform
             xmax, ymax = g * [cstart, rstart]
             obj.gtransform = Affine(g.a, g.b, xmax, g.d, g.e, ymax)
+            # self.gtransform = Affine(g.a, g.b, xmax, g.d, g.e, ymax)
         return obj
 
     # def __add__(self, other):
@@ -327,6 +344,8 @@ class RectifiedGrid(SubRectifiedGrid, np.ma.core.MaskedArray):
 
         if dtype is None:
             dtype = self.dtype
+        if dtype == 'float64':
+            dtype = 'float32'
 
         profile = {
             'count': count,
@@ -367,11 +386,26 @@ class RectifiedGrid(SubRectifiedGrid, np.ma.core.MaskedArray):
         #         dst.write_mask(255 * (~self.mask).astype('uint8'))
         #     dst.close()
 
+    def masked_mask(self, mask, copy=False):
+        raster = self
+        if copy:
+            raster = self.copy()
+        raster[mask] = np.ma.masked
+        return raster
+
     def masked_equal(self, value, copy=False):
         raster = self
         if copy:
             raster = self.copy()
-        raster[:] = np.ma.masked_equal(raster, value)
+        raster[:] = np.ma.masked_equal(raster, value, copy=True)
+        return raster
+
+    def masked_not_equal(self, value, copy=False):
+        raster = self
+        if copy:
+            raster = self.copy()
+        raster[:] = np.ma.masked_not_equal(raster, value, copy=True)
+        # raster[raster != 3.] = np.ma.masked
         return raster
 
     def masked_values(self, value, copy=False):
@@ -379,6 +413,30 @@ class RectifiedGrid(SubRectifiedGrid, np.ma.core.MaskedArray):
         if copy:
             raster = self.copy()
         raster[:] = np.ma.masked_values(raster, value)
+        return raster
+
+    def masked_greater_equal(self, value, copy=False, **kwargs):
+        raster = self
+        if copy:
+            raster = self.copy()
+        raster[:] = np.ma.masked_greater_equal(raster, value, **kwargs)
+        return raster
+
+    def masked_less_equal(self, value, copy=False, **kwargs):
+        raster = self
+        if copy:
+            raster = self.copy()
+        raster[:] = np.ma.masked_less_equal(raster, value, **kwargs)
+        return raster
+
+    def threshold_binary(self, threshold=0, equal=False, copy=False):
+        raster = self
+        if copy:
+            raster = self.copy()
+        if equal:
+            raster[:] = raster >= threshold
+        else:
+            raster[:] = raster > threshold
         return raster
 
     def positive(self, copy=False):
@@ -396,6 +454,13 @@ class RectifiedGrid(SubRectifiedGrid, np.ma.core.MaskedArray):
         raster.norm()
         return raster
 
+    def replace_value(self, oldvalue, value, copy=False):
+        raster = self
+        if copy:
+            raster = self.copy()
+        raster[raster == oldvalue] = value
+        return raster
+
     def log(self, copy=False):
         raster = self
         if copy:
@@ -407,7 +472,9 @@ class RectifiedGrid(SubRectifiedGrid, np.ma.core.MaskedArray):
         raster = self
         if copy:
             raster = self.copy()
-        raster[:] = (raster / raster.max())[:]
+        max = raster.max()
+        if max != 0:
+            raster[:] = (raster / max)[:]
         return raster
 
     def gaussian_filter(self, sigma, mode="constant", copy=False, **kwargs):
@@ -418,8 +485,20 @@ class RectifiedGrid(SubRectifiedGrid, np.ma.core.MaskedArray):
             raster[:] = ndimage.gaussian_filter(raster, sigma, mode=mode, **kwargs)
         return raster
 
-    def fill_underlying_data(self, fill_value=None):
+    def fill_underlying_data(self, fill_value=None, copy=False):
+        raster = self
+        if copy:
+            raster = self.copy()
         self.data[:] = self.filled(fill_value)
+        return raster
+
+    def unmask(self, fill_value=None, copy=False):
+        raster = self
+        if copy:
+            raster = self.copy()
+        raster.data[raster.mask] = fill_value
+        raster.mask = False
+        return raster
 
     def to_srs_like(self, rgrid, src_nodata=None, dst_nodata=None,
                     resampling=Resampling.bilinear):
@@ -498,7 +577,8 @@ class RectifiedGrid(SubRectifiedGrid, np.ma.core.MaskedArray):
     def plot(self, cmap='Greys'):
         if isinstance(cmap, str):
             cmap = plt.get_cmap(cmap)
-        plt.imshow(self, cmap=cmap)
+        mapimg = plt.imshow(self, cmap=cmap)
+        plt.colorbar(mapimg, orientation='vertical')
 
     def get_basemap(self, ax=None):
         minx, miny, maxx, maxy = self.geollur
@@ -509,9 +589,10 @@ class RectifiedGrid(SubRectifiedGrid, np.ma.core.MaskedArray):
             epsg=epsg, ax=ax)
 
     def plotmap(self, legend=False, arcgis=False, coast=False, countries=False,
-                rivers=False, grid=False, bluemarble=False, etopo=False,
+                rivers=False, grid=False, gridrange=2, bluemarble=False, etopo=False,
                 maptype=None, cmap=None, norm=None, logcolor=False, vmin=None,
-                vmax=None, ax=None, basemap=None):
+                vmax=None, ax=None, basemap=None, ticks=None, minor_thresholds=None,
+                arcgisxpixels=1000):
         if not BASEMAP:
             raise ImportError("Cannot load mpl_toolkits module")
         if maptype == 'minimal':
@@ -544,7 +625,7 @@ class RectifiedGrid(SubRectifiedGrid, np.ma.core.MaskedArray):
 
         if arcgis:
             m.arcgisimage(service='ESRI_Imagery_World_2D',
-                          xpixels=2000, verbose= True)
+                          xpixels=arcgisxpixels, verbose= True)
 
         mapimg = m.imshow(np.flipud(self), cmap=cmap, norm=norm,
                           vmin=vmin, vmax=vmax)
@@ -556,10 +637,14 @@ class RectifiedGrid(SubRectifiedGrid, np.ma.core.MaskedArray):
         if rivers:
             m.drawrivers(linewidth=0.2, linestyle='solid', color='b')
         if grid:
-            m.drawparallels(np.arange(-90,90,2),labels=[1,0,0,0],fontsize=10)
-            m.drawmeridians(np.arange(-90,90,2),labels=[0,0,0,1],fontsize=10)
+            m.drawparallels(np.arange(-90,90,gridrange),labels=[1,0,0,0],fontsize=10)
+            m.drawmeridians(np.arange(-90,90,gridrange),labels=[0,0,0,1],fontsize=10)
         if legend:
-            plt.colorbar(mapimg, orientation='vertical', ax=ax)
+            if logcolor:
+                formatter = LogFormatter(10, labelOnlyBase=False, minor_thresholds=minor_thresholds)
+                cbar = plt.colorbar(mapimg, orientation='vertical', ax=ax, ticks=ticks, format=formatter)
+            else:
+                cbar = plt.colorbar(mapimg, orientation='vertical', ax=ax, ticks=ticks)
 
         return m, mapimg
 
@@ -582,3 +667,11 @@ class RectifiedGrid(SubRectifiedGrid, np.ma.core.MaskedArray):
         raster[:] = f(raster, *args, **kwargs)
         raster.mask = self.mask.copy()
         return raster
+
+    def crop(self, value=None):
+        if value is None:
+            m = ~self.mask
+        else:
+            m = self != value
+        return self[np.ix_(m.any(1),
+                           m.any(0))]
