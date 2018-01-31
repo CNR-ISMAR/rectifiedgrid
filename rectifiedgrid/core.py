@@ -477,16 +477,19 @@ class RectifiedGrid(SubRectifiedGrid, np.ma.core.MaskedArray):
             raster[:] = (raster / max)[:]
         return raster
 
-    def gaussian_conv(self, geosigma, mode="constant", copy=False, **kwargs):
+    def gaussian_conv(self, geosigma, mode="constant", copy=False,
+                      **kwargs):
         return self.gaussian_filter(geosigma/self.resolution,
-                                    mode=mode, copy=copy, **kwargs)
+                                    mode=mode, copy=copy,
+                                    **kwargs)
 
-    def gaussian_filter(self, sigma, mode="constant", copy=False, **kwargs):
+    def gaussian_filter(self, sigma, mode="constant", copy=False,
+                        **kwargs):
         raster = self
         if copy:
             raster = self.copy()
         if sigma > 0:
-            raster[:] = ndimage.gaussian_filter(raster, sigma, mode=mode, **kwargs)
+            raster.data[:] = ndimage.gaussian_filter(raster, sigma, mode=mode, **kwargs)
         return raster
 
     def fill_underlying_data(self, fill_value=None, copy=False):
