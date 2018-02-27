@@ -489,7 +489,10 @@ class RectifiedGrid(SubRectifiedGrid, np.ma.core.MaskedArray):
         if copy:
             raster = self.copy()
         if sigma > 0:
-            raster.data[:] = ndimage.gaussian_filter(raster, sigma, mode=mode, **kwargs)
+            # filled data with 0 to avoid influence from masked values
+            raster.data[:] = ndimage.gaussian_filter(raster.filled(0),
+                                                     sigma, mode=mode,
+                                                     **kwargs)
         return raster
 
     def fill_underlying_data(self, fill_value=None, copy=False):
