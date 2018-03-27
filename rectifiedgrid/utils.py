@@ -7,7 +7,7 @@ from rasterio.crs import CRS
 from matplotlib.colors import LinearSegmentedColormap
 
 
-EEA_GRID_RESOLUTIONS = [25, 100, 250, 500, 1000, 2500, 10000, 25000, 100000]
+EEA_GRID_RESOLUTIONS = [25, 100, 250, 500, 1000, 2500, 5000, 10000, 25000, 100000]
 
 
 def calculate_gbounds(bounds, res):
