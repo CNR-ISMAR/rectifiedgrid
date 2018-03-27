@@ -7,7 +7,7 @@ def read(fname):
 
 setup(
     name = "rectifiedgrid", # or RectifiedGrid
-    version = "1.0.0-beta.2",
+    version = "1.0.0-beta.4",
     author = "Stefano Menegon",
     author_email = "ste.menegon@gmail.com",
     description = ("RectifiedGrid is a python module to deal with rectified grid."),
@@ -17,14 +17,15 @@ setup(
     packages=['rectifiedgrid'],
     # long_description=read('README'),
     install_requires = [
-        # I/O
-        'rasterio',
-        'fiona',
-
         # data structures and analyses
         'numpy',
         'geopandas',
         'scipy',
+
+        # I/O
+        'rasterio',
+        'fiona',
+
 
         # vector data utils
         'shapely',

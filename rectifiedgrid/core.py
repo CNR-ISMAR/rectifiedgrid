@@ -263,12 +263,10 @@ class RectifiedGrid(SubRectifiedGrid, np.ma.core.MaskedArray):
         np.maximum(self, array, self)
 
     def rasterize_features_area(self, features):
-        self.rasterize_features(features)
+        self.rasterize_features(features, all_touched=True)
         boundary = self - ndimage.binary_erosion(self)
-
         if len(features) != 1:
             # create a spatialindex
-            # print "create spatial index"
             stream = ((i, geo.bounds, value) for i, (geo, value) in
                       enumerate(features))
             sindex = RTreeIndex(stream)
@@ -479,12 +477,22 @@ class RectifiedGrid(SubRectifiedGrid, np.ma.core.MaskedArray):
             raster[:] = (raster / max)[:]
         return raster
 
-    def gaussian_filter(self, sigma, mode="constant", copy=False, **kwargs):
+    def gaussian_conv(self, geosigma, mode="constant", copy=False,
+                      **kwargs):
+        return self.gaussian_filter(geosigma/self.resolution,
+                                    mode=mode, copy=copy,
+                                    **kwargs)
+
+    def gaussian_filter(self, sigma, mode="constant", copy=False,
+                        **kwargs):
         raster = self
         if copy:
             raster = self.copy()
         if sigma > 0:
-            raster[:] = ndimage.gaussian_filter(raster, sigma, mode=mode, **kwargs)
+            # filled data with 0 to avoid influence from masked values
+            raster.data[:] = ndimage.gaussian_filter(raster.filled(0),
+                                                     sigma, mode=mode,
+                                                     **kwargs)
         return raster
 
     def fill_underlying_data(self, fill_value=None, copy=False):
@@ -508,7 +516,6 @@ class RectifiedGrid(SubRectifiedGrid, np.ma.core.MaskedArray):
             src_nodata = self.fill_value
         if dst_nodata is None:
             dst_nodata = rgrid.fill_value
-        # print src_nodata, dst_nodata
         # TODO: actually this modify the original data
         self.fill_underlying_data(src_nodata)
 
@@ -661,6 +668,14 @@ class RectifiedGrid(SubRectifiedGrid, np.ma.core.MaskedArray):
                                          (xi[None, :], yi[:, None]),
                                          method=method)
         raster[np.isnan(raster)] = np.ma.masked
+        return raster
+
+    def wrap_func(self, f, *args, **kwargs):
+        # TODO: deal with type (the f could change the type)
+        # TODO
+        raster = self.copy()
+        raster[:] = f(raster, *args, **kwargs)
+        raster.mask = self.mask.copy()
         return raster
 
     def crop(self, value=None):
