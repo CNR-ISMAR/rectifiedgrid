@@ -38,9 +38,12 @@ logger = logging.getLogger(__name__)
 
 def read_vector(vector, res, column=None, value=1., compute_area=False,
                 dtype=np.float64, eea=False, epsg=None,
-                bounds=None, grid=None, all_touched=True, fillvalue=0.):
+                bounds=None, grid=None, all_touched=True, fillvalue=0.,
+                use_centroid=False):
     logger.debug('Reading vector as geodataframe')
     gdf = GeoDataFrame.from_file(vector)
+    if use_centroid:
+        gdf.geometry = gdf.geometry.centroid
     return read_df(gdf, res, column, value, compute_area,
                    dtype, eea, epsg, bounds, grid,
                    all_touched=all_touched, fillvalue=fillvalue)
