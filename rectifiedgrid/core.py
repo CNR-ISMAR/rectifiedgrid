@@ -135,6 +135,14 @@ def read_raster(raster, masked=True):
                               src.affine,
                               mask=np.ma.nomask)
     src.close()
+    # check and fix fill_value dtype
+    if not np.can_cast(rgrid.fill_value, rgrid.dtype, casting='safe'):
+        fill_value = rgrid.fill_value.astype(rgrid.dtype)
+        if fill_value in rgrid.data:
+            raise Exception('Cannot change the fill_value. The value "{}" is present in the array'.format(fill_value))
+        rgrid.set_fill_value(fill_value)
+        logger.warning("read_raster: the fill_value has been changed to {}".format(fill_value))
+
     return rgrid
 
 
@@ -343,7 +351,7 @@ class RectifiedGrid(SubRectifiedGrid, np.ma.core.MaskedArray):
         count = 1
 
         if dtype is None:
-            dtype = self.dtype
+            dtype = self.dtype.name
         if dtype == 'float64':
             dtype = 'float32'
 
@@ -429,6 +437,13 @@ class RectifiedGrid(SubRectifiedGrid, np.ma.core.MaskedArray):
         raster[:] = np.ma.masked_less_equal(raster, value, **kwargs)
         return raster
 
+    def masked_less(self, value, copy=False, **kwargs):
+        raster = self
+        if copy:
+            raster = self.copy()
+        raster[:] = np.ma.masked_less(raster, value, **kwargs)
+        return raster
+
     def threshold_binary(self, threshold=0, equal=False, copy=False):
         raster = self
         if copy:
@@ -499,7 +514,7 @@ class RectifiedGrid(SubRectifiedGrid, np.ma.core.MaskedArray):
         raster = self
         if copy:
             raster = self.copy()
-        self.data[:] = self.filled(fill_value)
+        raster.data[:] = self.filled(fill_value)
         return raster
 
     def unmask(self, fill_value=None, copy=False):
@@ -515,16 +530,16 @@ class RectifiedGrid(SubRectifiedGrid, np.ma.core.MaskedArray):
         if src_nodata is None:
             src_nodata = self.fill_value
         if dst_nodata is None:
-            dst_nodata = rgrid.fill_value
-        # TODO: actually this modify the original data
-        self.fill_underlying_data(src_nodata)
+            dst_nodata = src_nodata
+        source = self.copy()
+        source.fill_underlying_data(src_nodata)
 
         # dst_shape = rgrid.shape
         dst_transform = rgrid.gtransform
         dst_crs = rgrid.crs
         destination = rgrid.astype(self.dtype).copy()
         reproject(
-            self.copy(),
+            source,
             destination=destination,
             src_transform=self.gtransform,
             src_nodata=src_nodata,
