@@ -102,3 +102,8 @@ class TestInitialization(object):
     def test_unsharedmask(self):
         grid1 = get_demo_data('rg9x9')
         assert (grid1.sharedmask == False)
+
+    def test_fix_fill_value(self, shared_datadir):
+        file_path = shared_datadir / 'wrong_fill_value.tiff'
+        grid = rg.read_raster(str(file_path))
+        assert(grid.fill_value == 32767)
