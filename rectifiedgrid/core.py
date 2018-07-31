@@ -2,6 +2,7 @@ from __future__ import absolute_import
 
 import logging
 import copy
+import numbers
 import numpy as np
 from geopandas import GeoDataFrame
 from .utils import calculate_gbounds, calculate_eea_gbounds, parse_projection, transform
@@ -137,13 +138,21 @@ def read_raster(raster, masked=True):
     src.close()
     # check and fix fill_value dtype
     if not np.can_cast(rgrid.fill_value, rgrid.dtype, casting='safe'):
-        fill_value = rgrid.fill_value.astype(rgrid.dtype)
-        if fill_value in rgrid.data:
-            raise Exception('Cannot change the fill_value. The value "{}" is present in the array'.format(fill_value))
+        fill_value = guess_fill_value(rgrid)
         rgrid.set_fill_value(fill_value)
         logger.warning("read_raster: the fill_value has been changed to {}".format(fill_value))
 
     return rgrid
+
+
+def guess_fill_value(obj):
+    if issubclass(obj.dtype.type, numbers.Integral):
+        fill_value = np.iinfo(obj.dtype.type).max
+    elif issubclass(obj.dtype.type, numbers.Real):
+        fill_value = np.finfo(obj.dtype.type).max
+    if fill_value in obj.data:
+        raise Exception('Cannot guess the fill_value. The value "{}" is present in the array'.format(fill_value))
+    return fill_value
 
 
 def _geofactory(bounds, proj, res, dtype=np.float64, eea=False):
