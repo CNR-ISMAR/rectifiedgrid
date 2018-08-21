@@ -129,14 +129,18 @@ def read_raster(raster, masked=True, driver=None):
     if masked:
         _raster = src.read(1, masked=masked)
         # return _raster
+        if isinstance(src.transform, Affine):
+            transform = src.transform
+        else:
+            transform = src.affine  # for compatibility with rasterio 0.36
         rgrid = RectifiedGrid(_raster,
                               proj,
-                              src.affine,
+                              transform,
                               mask=_raster.mask)
     else:
         rgrid = RectifiedGrid(src.read(1),
                               proj,
-                              src.affine,
+                              transform,
                               mask=np.ma.nomask)
     src.close()
     # check and fix fill_value dtype
