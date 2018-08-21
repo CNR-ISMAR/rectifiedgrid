@@ -117,8 +117,8 @@ def read_features_like(rgrid, features, compute_area=False, copy=True, all_touch
     return raster
 
 
-def read_raster(raster, masked=True):
-    src = rasterio.open(raster)
+def read_raster(raster, masked=True, driver=None):
+    src = rasterio.open(raster, driver=driver)
     if src.count > 1:
         src.close()
         raise NotImplementedError('Cannot load a multiband layer')
@@ -363,8 +363,8 @@ class RectifiedGrid(SubRectifiedGrid, np.ma.core.MaskedArray):
         count = 1
 
         if dtype is None:
-            dtype = self.dtype.name
-        if dtype == 'float64':
+            dtype = self.dtype.type
+        if dtype == 'float64' or dtype == np.float64:
             dtype = 'float32'
 
         profile = {
