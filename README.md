@@ -15,6 +15,12 @@ data through OGC interoperable services.
 RectifiedGrid has been initialy developed to support Integrated
 Coastal Management and Maritime Spatial Planning analyses.
 
+Installation
+============
+When using Rectifiedgrid, you need to make sure that Geopandas is installed with rtree support.
+Refer to following link for more informations: 
+* http://geopandas.org/install.html#installing-with-pip
+* http://toblerity.org/rtree/install.html
 
 Usage
 =====

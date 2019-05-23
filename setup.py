@@ -29,8 +29,10 @@ setup(
 
         # vector data utils
         'shapely',
-        'rtree==0.8.3',
-
+        #'rtree==0.8.3',
+        'rtree',
+        # 'pandas>=0.18.0',
+        'pandas',
         # utils
         'affine'
     ],

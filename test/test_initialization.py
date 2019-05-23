@@ -14,6 +14,7 @@ except:
     # rasterio versions 0.xx
     from rasterio.warp import RESAMPLING as Resampling
 
+TESTDATA_DIR = os.path.join(os.path.dirname(__file__), 'data')
 
 class TestInitialization(object):
     def test_initproj(self):
@@ -71,7 +72,7 @@ class TestInitialization(object):
     def test_masked_value(self):
         grid = get_demo_data()
         grid.masked_values(0.)
-        assert round(grid.mean(), 2) == 1.36
+        assert np.round(grid.mean(), 2) == 1.36
 
     def test_reproject(self):
         grid4326 = get_demo_data('line4326')
@@ -82,7 +83,7 @@ class TestInitialization(object):
         rgrid.reproject(grid4326, Resampling.nearest)
         assert rgrid.max() == 1.
         # print "############", rgrid.mean()
-        assert pytest.approx(float(rgrid.mean()), 0.001) == 0.15
+        assert np.round(rgrid.mean(), 2) == 0.16
 
     def test_patch(self):
         grid1 = get_demo_data('rg9x9')
@@ -103,7 +104,7 @@ class TestInitialization(object):
         grid1 = get_demo_data('rg9x9')
         assert (grid1.sharedmask == False)
 
-    def test_fix_fill_value(self, shared_datadir):
-        file_path = shared_datadir / 'wrong_fill_value.tiff'
+    def test_fix_fill_value(self):
+        file_path = os.path.join(TESTDATA_DIR, 'wrong_fill_value.tiff')
         grid = rg.read_raster(str(file_path))
         assert(grid.fill_value == 32767)

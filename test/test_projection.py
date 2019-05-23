@@ -17,7 +17,4 @@ class TestProjection(object):
     def test_reproject(self):
         grid4326 = get_demo_data('line4326')
         grid3035 = get_demo_data('line3035')
-        print grid4326
-        # print grid3035
-        print np.round(grid3035.reproject(grid4326, Resampling.nearest), 2)
-        assert True
+        assert (grid3035.reproject(grid4326, Resampling.nearest) == grid3035).all()

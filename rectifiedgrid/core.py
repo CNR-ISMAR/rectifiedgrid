@@ -1,5 +1,4 @@
-from __future__ import absolute_import
-
+import pyproj
 import logging
 import copy
 import numbers
@@ -21,7 +20,7 @@ from shapely import ops
 from rtree.index import Index as RTreeIndex
 from scipy import ndimage
 from scipy import interpolate
-from itertools import izip
+
 import matplotlib.pyplot as plt
 from matplotlib import colors
 from matplotlib.ticker import LogFormatter
@@ -297,7 +296,7 @@ class RectifiedGrid(SubRectifiedGrid, np.ma.core.MaskedArray):
             _intersection = sindex.intersection
 
         # https://github.com/Toblerity/rtree/issues/48
-        for c in izip(*np.where(boundary > 0)):
+        for c in zip(*np.where(boundary > 0)):
             c_poly = self.cell_as_polygon(*c)
             _u = None
 
@@ -345,21 +344,60 @@ class RectifiedGrid(SubRectifiedGrid, np.ma.core.MaskedArray):
 
     @property
     def crs(self):
-        crs = {}
-        if not self.proj:
-            return crs
-        for item in self.proj.srs.split():
-            k, v = item.split('=')
+        """
+        Converts the pyproj.CRS to dictionary
+        .. warning:: this was copy by dev version of pyproj (pyproj,CRS.to_dic).
+        .. Use directly CRS.to_dict method when released
+        Returns
+        -------
+        dict: PROJ params in dict format.
+        """
+
+        def parse(val):
+            if val.lower() == "true":
+                return True
+            elif val.lower() == "false":
+                return False
             try:
-                v = int(v)
+                return int(val)
             except ValueError:
                 pass
-            if v == 'True':
-                v = True
-            elif v == 'False':
-                v = False
-            crs[k.replace('+', '')] = v
-        return crs
+            try:
+                return float(val)
+            except ValueError:
+                pass
+            val_split = val.split(",")
+            if len(val_split) > 1:
+                val = [float(sval.strip()) for sval in val_split]
+            return val
+
+        items = map(
+            lambda kv: len(kv) == 2 and (kv[0], parse(kv[1])) or (kv[0], None),
+            (
+                part.lstrip("+").split("=", 1)
+                for part in self.proj.crs.to_proj4().strip().split()
+            ),
+        )
+        crs_dict = {key: value for key, value in items if value is not False}
+        return crs_dict
+
+        # crs = {}
+        # if not self.proj:
+        #     return crs
+        # for item in self.proj.srs.split():
+        #
+        #    kv = item.split('=')
+        #
+        #   try:
+        #       v = int(v)
+        #    except ValueError:
+        #        pass
+        #    if v == 'True':
+        #        v = True
+        #    elif v == 'False':
+        #        v = False
+        #    crs[k.replace('+', '')] = v
+        # return crs
 
     def write_raster(self, filepath, dtype=None, driver='GTiff', nodata=None, compress=None):
         """Write a raster file

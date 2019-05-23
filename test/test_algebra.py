@@ -19,4 +19,4 @@ class TestAlgebra(object):
     def test_gaussian_filter(self):
         grid = get_demo_data('rg9x9')
         grid.gaussian_filter(2.)
-        assert round(grid.sum(), 2) == 0.95
+        assert np.round(grid.sum(), 2) == 0.95
