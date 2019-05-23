@@ -5,18 +5,19 @@ from setuptools import setup
 def read(fname):
     return open(os.path.join(os.path.dirname(__file__), fname)).read()
 
+
 setup(
-    name = "rectifiedgrid", # or RectifiedGrid
-    version = "1.0.0-beta.4",
-    author = "Stefano Menegon",
-    author_email = "ste.menegon@gmail.com",
-    description = ("RectifiedGrid is a python module to deal with rectified grid."),
-    license = "GPL3",
-    keywords = "",
-    url = "http://todo.todo",
+    name="rectifiedgrid",  # or RectifiedGrid
+    version="1.0.0-beta.4",
+    author="Stefano Menegon",
+    author_email="ste.menegon@gmail.com",
+    description="RectifiedGrid is a python module to deal with rectified grid.",
+    license="GPL3",
+    keywords="",
+    url="http://todo.todo",
     packages=['rectifiedgrid'],
     # long_description=read('README'),
-    install_requires = [
+    install_requires=[
         # data structures and analyses
         'numpy',
         'geopandas',
@@ -26,15 +27,12 @@ setup(
         'rasterio',
         'fiona',
 
-
         # vector data utils
         'shapely',
-        #'rtree==0.8.3',
         'rtree',
-        # 'pandas>=0.18.0',
         'pandas',
         # utils
-        'affine'
+        'affine', 'matplotlib'
     ],
     classifiers=[
         "Development Status :: 4 - Beta",

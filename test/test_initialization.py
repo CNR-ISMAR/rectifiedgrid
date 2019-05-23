@@ -8,13 +8,15 @@ from shapely import geometry
 import numpy as np
 from scipy import ndimage
 from rasterio.warp import reproject
+
 try:
     from rasterio.enums import Resampling
-except:
+except ImportError:
     # rasterio versions 0.xx
     from rasterio.warp import RESAMPLING as Resampling
 
 TESTDATA_DIR = os.path.join(os.path.dirname(__file__), 'data')
+
 
 class TestInitialization(object):
     def test_initproj(self):
@@ -102,9 +104,9 @@ class TestInitialization(object):
 
     def test_unsharedmask(self):
         grid1 = get_demo_data('rg9x9')
-        assert (grid1.sharedmask == False)
+        assert grid1.sharedmask is False
 
     def test_fix_fill_value(self):
         file_path = os.path.join(TESTDATA_DIR, 'wrong_fill_value.tiff')
         grid = rg.read_raster(str(file_path))
-        assert(grid.fill_value == 32767)
+        assert (grid.fill_value == 32767)

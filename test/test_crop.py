@@ -1,12 +1,4 @@
-import tempfile
-import os
-import pyproj
-import rectifiedgrid as rg
 from rectifiedgrid.demo import get_demo_data
-from gisdata import GOOD_DATA
-from shapely import geometry
-import numpy as np
-from scipy import ndimage
 
 
 class TestCrop(object):

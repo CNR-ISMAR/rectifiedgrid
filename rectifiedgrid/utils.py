@@ -6,7 +6,6 @@ from functools import partial
 from rasterio.crs import CRS
 from matplotlib.colors import LinearSegmentedColormap
 
-
 EEA_GRID_RESOLUTIONS = [25, 100, 250, 500, 1000, 2500, 5000, 10000, 25000, 100000]
 
 
@@ -20,10 +19,10 @@ def calculate_gbounds(bounds, res):
     if height_reminder == res:
         height_reminder = 0
     gbounds = [
-        bounds[0] - width_reminder/2.,
-        bounds[1] - height_reminder/2.,
-        bounds[2] + width_reminder/2.,
-        bounds[3] + height_reminder/2.,
+        bounds[0] - width_reminder / 2.,
+        bounds[1] - height_reminder / 2.,
+        bounds[2] + width_reminder / 2.,
+        bounds[3] + height_reminder / 2.,
     ]
     return gbounds
 
@@ -68,10 +67,10 @@ def read_color_table(color_file, cmap_name='newcmap'):
     df = pd.read_table(color_file, sep='\s+',
                        header=None, names=['value', 'r', 'g', 'b'],
                        comment='#')
-    value_norm =  (df.value - df.value.min()) / (df.value.max() - df.value.min())
+    value_norm = (df.value - df.value.min()) / (df.value.max() - df.value.min())
     df.loc[:, 'value'] = value_norm
 
-    levels_colors = list(zip(df.value, list(zip(df.r/255, df.g/255, df.b/255))))
+    levels_colors = list(zip(df.value, list(zip(df.r / 255, df.g / 255, df.b / 255))))
     print(levels_colors)
     return LinearSegmentedColormap.from_list(cmap_name,
                                              levels_colors,

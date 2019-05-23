@@ -1,6 +1,5 @@
-import pyproj
 import logging
-import copy
+import copy as copyp
 import numbers
 import numpy as np
 from geopandas import GeoDataFrame
@@ -9,9 +8,10 @@ from affine import Affine
 from rasterio.features import rasterize
 import rasterio
 from rasterio.warp import reproject
+
 try:
     from rasterio.warp import RESAMPLING as Resampling
-except:
+except ImportError:
     from rasterio.enums import Resampling
 from rasterio.warp import calculate_default_transform
 
@@ -29,8 +29,9 @@ BASEMAP = False
 
 try:
     from mpl_toolkits import basemap
+
     BASEMAP = True
-except:
+except ImportError:
     pass
 
 logger = logging.getLogger(__name__)
@@ -97,7 +98,7 @@ def read_features(features, res, crs, bounds=None, compute_area=False,
             bounds = features.bounds
         else:
             b = np.array([feature[0].bounds for feature in features])
-            bounds = np.min(b[:,0]), np.min(b[:,1]), np.max(b[:,2]), np.max(b[:,3])
+            bounds = np.min(b[:, 0]), np.min(b[:, 1]), np.max(b[:, 2]), np.max(b[:, 3])
     rgrid = _geofactory(bounds, proj, res, dtype, eea)
     return read_features_like(rgrid, features, compute_area, copy=False,
                               all_touched=all_touched)
@@ -125,21 +126,23 @@ def read_raster(raster, masked=True, driver=None):
         proj = parse_projection(src.crs)
     else:
         proj = None
+
+    if isinstance(src.transform, Affine):
+        _transform = src.transform
+    else:
+        _transform = src.affine  # for compatibility with rasterio 0.36
+
     if masked:
         _raster = src.read(1, masked=masked)
         # return _raster
-        if isinstance(src.transform, Affine):
-            transform = src.transform
-        else:
-            transform = src.affine  # for compatibility with rasterio 0.36
         rgrid = RectifiedGrid(_raster,
                               proj,
-                              transform,
+                              _transform,
                               mask=_raster.mask)
     else:
         rgrid = RectifiedGrid(src.read(1),
                               proj,
-                              transform,
+                              _transform,
                               mask=np.ma.nomask)
     src.close()
     # check and fix fill_value dtype
@@ -180,10 +183,11 @@ def _geofactory(bounds, proj, res, dtype=np.float64, eea=False):
 class SubRectifiedGrid(np.ndarray):
     """Defines a base np.ndarray subclass, that stores rectified grid metadata.
     """
+
     def __new__(cls, data, proj, gtransform, dtype=None, order=None):
         obj = np.asanyarray(data, dtype, order).view(cls)
-        obj.proj = copy.deepcopy(parse_projection(proj))
-        obj.gtransform = copy.deepcopy(gtransform)
+        obj.proj = copyp.deepcopy(parse_projection(proj))
+        obj.gtransform = copyp.deepcopy(gtransform)
         return obj
 
     def __array_finalize__(self, obj):
@@ -191,16 +195,16 @@ class SubRectifiedGrid(np.ndarray):
                             '__array_finalize__', None)):
             super(SubRectifiedGrid, self).__array_finalize__(obj)
 
-        self.proj = copy.deepcopy(getattr(obj, 'proj', None))
-        self.gtransform = copy.deepcopy(getattr(obj, 'gtransform', None))
+        self.proj = copyp.deepcopy(getattr(obj, 'proj', None))
+        self.gtransform = copyp.deepcopy(getattr(obj, 'gtransform', None))
         # self.proj = getattr(obj, 'proj', None)
         # self.gtransform = getattr(obj, 'gtransform', None)
         return
 
     def copy(self, *args, **kwargs):
         obj = super(SubRectifiedGrid, self).copy(*args, **kwargs)
-        obj.proj = copy.deepcopy(getattr(self, 'proj', None))
-        obj.gtransform = copy.deepcopy(getattr(self, 'gtransform', None))
+        obj.proj = copyp.deepcopy(getattr(self, 'proj', None))
+        obj.gtransform = copyp.deepcopy(getattr(self, 'gtransform', None))
         return obj
 
     def __getitem__(self, *args, **kwargs):
@@ -264,10 +268,10 @@ class RectifiedGrid(SubRectifiedGrid, np.ma.core.MaskedArray):
         """
         """
         _array = rasterize(features,
-                            fill=0,
-                            transform=self.gtransform,
-                            out_shape=self.shape,
-                            all_touched=all_touched)
+                           fill=0,
+                           transform=self.gtransform,
+                           out_shape=self.shape,
+                           all_touched=all_touched)
         if mode == 'replace':
             self[:] = _array
         elif mode == 'patch':
@@ -313,7 +317,7 @@ class RectifiedGrid(SubRectifiedGrid, np.ma.core.MaskedArray):
     def cell_as_polygon(self, row, col):
         # TODO: check for valid row and col
         minx, maxy = self.gtransform * (col, row)
-        maxx, miny = self.gtransform * (col+1, row+1)
+        maxx, miny = self.gtransform * (col + 1, row + 1)
         return box(minx, miny, maxx, maxy)
 
     @property
@@ -414,8 +418,8 @@ class RectifiedGrid(SubRectifiedGrid, np.ma.core.MaskedArray):
             'crs': self.crs,
             'driver': driver,
             'dtype': dtype,
-            #'nodata': 0,
-            #'tiled': False,
+            # 'nodata': 0,
+            # 'tiled': False,
             'transform': self.gtransform,
             'width': self.shape[1],
             'height': self.shape[0],
@@ -541,14 +545,14 @@ class RectifiedGrid(SubRectifiedGrid, np.ma.core.MaskedArray):
         raster = self
         if copy:
             raster = self.copy()
-        max = raster.max()
-        if max != 0:
-            raster[:] = (raster / max)[:]
+        maxval = raster.max()
+        if maxval != 0:
+            raster[:] = (raster / maxval)[:]
         return raster
 
     def gaussian_conv(self, geosigma, mode="constant", copy=False,
                       **kwargs):
-        return self.gaussian_filter(geosigma/self.resolution,
+        return self.gaussian_filter(geosigma / self.resolution,
                                     mode=mode, copy=copy,
                                     **kwargs)
 
@@ -704,7 +708,7 @@ class RectifiedGrid(SubRectifiedGrid, np.ma.core.MaskedArray):
 
         if arcgis:
             m.arcgisimage(service='ESRI_Imagery_World_2D',
-                          xpixels=arcgisxpixels, verbose= True)
+                          xpixels=arcgisxpixels, verbose=True)
 
         mapimg = m.imshow(np.flipud(self), cmap=cmap, norm=norm,
                           vmin=vmin, vmax=vmax)
@@ -716,14 +720,14 @@ class RectifiedGrid(SubRectifiedGrid, np.ma.core.MaskedArray):
         if rivers:
             m.drawrivers(linewidth=0.2, linestyle='solid', color='b')
         if grid:
-            m.drawparallels(np.arange(-90,90,gridrange),labels=[1,0,0,0],fontsize=10)
-            m.drawmeridians(np.arange(-90,90,gridrange),labels=[0,0,0,1],fontsize=10)
+            m.drawparallels(np.arange(-90, 90, gridrange), labels=[1, 0, 0, 0], fontsize=10)
+            m.drawmeridians(np.arange(-90, 90, gridrange), labels=[0, 0, 0, 1], fontsize=10)
         if legend:
             if logcolor:
                 formatter = LogFormatter(10, labelOnlyBase=False, minor_thresholds=minor_thresholds)
-                cbar = plt.colorbar(mapimg, orientation='vertical', ax=ax, ticks=ticks, format=formatter)
+                plt.colorbar(mapimg, orientation='vertical', ax=ax, ticks=ticks, format=formatter)
             else:
-                cbar = plt.colorbar(mapimg, orientation='vertical', ax=ax, ticks=ticks)
+                plt.colorbar(mapimg, orientation='vertical', ax=ax, ticks=ticks)
 
         return m, mapimg
 
