@@ -611,7 +611,7 @@ class RectifiedGrid(SubRectifiedGrid, np.ma.core.MaskedArray):
         return destination
 
     def to_srs(self, srs, resolution=None, src_nodata=None, dst_nodata=None,
-               resampling=Resampling.nearest):
+               resampling=Resampling.bilinear):
         affine, width, height = calculate_default_transform(self.crs,
                                                             srs,
                                                             self.shape[1],
