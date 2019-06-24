@@ -4,10 +4,17 @@ import numbers
 import numpy as np
 from geopandas import GeoDataFrame
 from .utils import calculate_gbounds, calculate_eea_gbounds, parse_projection, transform
+from .hillshade import get_hs
 from affine import Affine
 from rasterio.features import rasterize
 import rasterio
 from rasterio.warp import reproject
+import cartopy
+import cartopy.feature as cpf
+from cartopy.mpl.gridliner import LONGITUDE_FORMATTER, LATITUDE_FORMATTER
+import cartopy.io.img_tiles as cimgt
+
+from matplotlib.colors import Normalize, SymLogNorm
 
 try:
     from rasterio.warp import RESAMPLING as Resampling
@@ -671,13 +678,43 @@ class RectifiedGrid(SubRectifiedGrid, np.ma.core.MaskedArray):
             resolution='h',
             epsg=epsg, ax=ax)
 
-    def plotmap(self, legend=False, arcgis=False, coast=False, countries=False,
-                rivers=False, grid=False, gridrange=2, bluemarble=False, etopo=False,
-                maptype=None, cmap=None, norm=None, logcolor=False, vmin=None,
-                vmax=None, ax=None, basemap=None, ticks=None, minor_thresholds=None,
-                arcgisxpixels=1000):
-        if not BASEMAP:
-            raise ImportError("Cannot load mpl_toolkits module")
+    def plotmap(self,
+                legend=False,
+                arcgis=False,
+                coast=False,
+                countries=False,
+                rivers=False,
+                grid=False,
+                gridrange=2,
+                bluemarble=False,
+                etopo=False,
+                maptype=None,
+                cmap=None,
+                norm=None,
+                logcolor=False,
+                vmin=None,
+                vmax=None,
+                ax=None,
+                basemap=None,
+                ticks=None,
+                minor_thresholds=(np.inf, np.inf),
+                arcgisxpixels=1000,
+                zoomlevel=2,
+                hillshade=False
+                ):
+
+        cprj = cartopy.crs.Mercator()
+        if ax is None:
+            ax = plt.gca(projection=cprj)
+        elif hasattr(ax, "projection"):
+            raise AttributeError("Passed axes doen't have projection attribute")
+
+        r = self.to_srs(cprj.proj4_params, resampling=Resampling.bilinear)
+
+        img_extent = [r.bounds[0],
+                      r.bounds[2],
+                      r.bounds[1],
+                      r.bounds[3]]
         if maptype == 'minimal':
             coast = True,
             countries = True
@@ -688,48 +725,80 @@ class RectifiedGrid(SubRectifiedGrid, np.ma.core.MaskedArray):
             arcgis = True
             grid = True
 
-        if basemap is None:
-            m = self.get_basemap(ax=ax)
-        else:
-            m = basemap
+        # if basemap is None:
+        #     m = self.get_basemap(ax=ax)
+        # else:
+        #     m = basemap
 
         if cmap is not None and isinstance(cmap, str):
             cmap = plt.get_cmap(cmap)
 
         if logcolor:
-            norm = colors.SymLogNorm(linthresh=5, linscale=1,
-                                     vmin=self.min(), vmax=self.max())
+            norm = SymLogNorm(linthresh=5, linscale=1,
+                              vmin=self.min(), vmax=self.max())
+        else:
+            norm = Normalize(vmin=self.min(), vmax=self.max())
 
-        if bluemarble:
-            m.bluemarble()
+        # if bluemarble:
+        #     m.bluemarble()
 
         if etopo:
-            m.etopo()
+            ax.add_image(cimgt.Stamen('terrain-background'), zoomlevel)
 
-        if arcgis:
-            m.arcgisimage(service='ESRI_Imagery_World_2D',
-                          xpixels=arcgisxpixels, verbose=True)
+        # if arcgis:
+        #     m.arcgisimage(service='ESRI_Imagery_World_2D',
+        #                   xpixels=arcgisxpixels, verbose=True)
 
-        mapimg = m.imshow(np.flipud(self), cmap=cmap, norm=norm,
-                          vmin=vmin, vmax=vmax)
+        # mapimg = m.imshow(np.flipud(self), cmap=cmap, norm=norm,
+        #                 vmin=vmin, vmax=vmax)
+
+        if hillshade:
+            r = get_hs(r, cmap, norm=norm,
+                       # blend_mode='soft'
+                       )
+
+        mapimg = ax.imshow(r,
+                           origin='upper',
+                           cmap=cmap,
+                           extent=img_extent,
+                           norm=norm,
+                           zorder=1
+                           )
+
+        # ax.add_feature(cpf.LAND)
+        # ax.add_feature(cpf.OCEAN)
+        #
+        # ax.add_feature(cpf.BORDERS, linestyle=':')
+        # ax.add_feature(cpf.LAKES,   alpha=0.5)
+        #
 
         if coast:
-            m.drawcoastlines()
+            # ax.add_feature(cpf.COASTLINE)
+            ax.coastlines(resolution='50m')
+
         if countries:
-            m.drawcountries()
+            ax.add_feature(cpf.BORDERS, linestyle=':')
         if rivers:
-            m.drawrivers(linewidth=0.2, linestyle='solid', color='b')
+            ax.add_feature(cpf.RIVERS)
         if grid:
-            m.drawparallels(np.arange(-90, 90, gridrange), labels=[1, 0, 0, 0], fontsize=10)
-            m.drawmeridians(np.arange(-90, 90, gridrange), labels=[0, 0, 0, 1], fontsize=10)
+            # m.drawparallels(np.arange(-90, 90, gridrange), labels=[1, 0, 0, 0], fontsize=10)
+            # m.drawmeridians(np.arange(-90, 90, gridrange), labels=[0, 0, 0, 1], fontsize=10)
+            gl = ax.gridlines(draw_labels=True)
+            gl.xlabels_top = gl.ylabels_right = False
+            gl.xformatter = LONGITUDE_FORMATTER
+            gl.yformatter = LATITUDE_FORMATTER
         if legend:
             if logcolor:
-                formatter = LogFormatter(10, labelOnlyBase=False, minor_thresholds=minor_thresholds)
+                formatter = LogFormatter(10,
+                                         labelOnlyBase=False,
+                                         minor_thresholds=minor_thresholds
+                                         )
                 plt.colorbar(mapimg, orientation='vertical', ax=ax, ticks=ticks, format=formatter)
             else:
                 plt.colorbar(mapimg, orientation='vertical', ax=ax, ticks=ticks)
 
-        return m, mapimg
+        ax.set_extent(img_extent, crs=cprj)
+        return ax, mapimg
 
     def griddata(self, x, y, z, method='nearest', copy=False):
         raster = self
