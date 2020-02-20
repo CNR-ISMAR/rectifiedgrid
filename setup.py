@@ -32,7 +32,7 @@ setup(
         'rtree',
         'pandas',
         # utils
-        'affine', 'matplotlib'
+        'affine', 'matplotlib', 'cartopy'
     ],
     classifiers=[
         "Development Status :: 4 - Beta",
