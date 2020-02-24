@@ -725,6 +725,11 @@ class RectifiedGrid(SubRectifiedGrid, np.ma.core.MaskedArray):
             arcgis = True
             grid = True
 
+        if vmax is None:
+            vmax = self.max()
+        if vmin is None:
+            vmin = self.min()
+
         # if basemap is None:
         #     m = self.get_basemap(ax=ax)
         # else:
@@ -735,9 +740,9 @@ class RectifiedGrid(SubRectifiedGrid, np.ma.core.MaskedArray):
 
         if logcolor:
             norm = SymLogNorm(linthresh=5, linscale=1,
-                              vmin=self.min(), vmax=self.max())
+                              vmin=vmin, vmax=vmax)
         else:
-            norm = Normalize(vmin=self.min(), vmax=self.max())
+            norm = Normalize(vmin=vmin, vmax=vmax)
 
         # if bluemarble:
         #     m.bluemarble()
