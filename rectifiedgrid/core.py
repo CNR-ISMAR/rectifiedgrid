@@ -72,7 +72,6 @@ def read_df(gdf, res, column=None, value=1., compute_area=False,
         grid = _geofactory(bounds, proj, res, dtype, eea)
     else:
         grid = grid.copy()
-
     return read_df_like(grid, gdf, column, value, compute_area, copy=False,
                         all_touched=all_touched, fillvalue=fillvalue)
 
@@ -707,7 +706,7 @@ class RectifiedGrid(SubRectifiedGrid, np.ma.core.MaskedArray):
         if ax is None:
             ax = plt.gca(projection=cprj)
         elif not hasattr(ax, "projection"):
-            raise AttributeError("Passed axes doen't have projection attribute")
+            raise AttributeError("Passed axes doesn't have projection attribute")
 
         r = self.to_srs(cprj.proj4_params, resampling=Resampling.bilinear)
 
@@ -738,11 +737,12 @@ class RectifiedGrid(SubRectifiedGrid, np.ma.core.MaskedArray):
         if cmap is not None and isinstance(cmap, str):
             cmap = plt.get_cmap(cmap)
 
-        if logcolor:
-            norm = SymLogNorm(linthresh=5, linscale=1,
-                              vmin=vmin, vmax=vmax)
-        else:
-            norm = Normalize(vmin=vmin, vmax=vmax)
+        if norm is None:
+            if logcolor:
+                norm = SymLogNorm(linthresh=5, linscale=1,
+                                  vmin=vmin, vmax=vmax)
+            else:
+                norm = Normalize(vmin=vmin, vmax=vmax)
 
         # if bluemarble:
         #     m.bluemarble()
