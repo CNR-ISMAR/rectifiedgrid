@@ -31,6 +31,7 @@ from scipy import interpolate
 import matplotlib.pyplot as plt
 from matplotlib import colors
 from matplotlib.ticker import LogFormatter
+import mapclassify
 
 BASEMAP = False
 
@@ -681,6 +682,7 @@ class RectifiedGrid(SubRectifiedGrid, np.ma.core.MaskedArray):
                 legend=False,
                 arcgis=False,
                 coast=False,
+                coast_resolution='50m',
                 countries=False,
                 rivers=False,
                 grid=False,
@@ -699,7 +701,9 @@ class RectifiedGrid(SubRectifiedGrid, np.ma.core.MaskedArray):
                 minor_thresholds=(np.inf, np.inf),
                 arcgisxpixels=1000,
                 zoomlevel=2,
-                hillshade=False
+                hillshade=False,
+                scheme=None,
+                ncolors=10
                 ):
 
         cprj = cartopy.crs.Mercator()
@@ -744,6 +748,17 @@ class RectifiedGrid(SubRectifiedGrid, np.ma.core.MaskedArray):
             else:
                 norm = Normalize(vmin=vmin, vmax=vmax)
 
+        if scheme is not None:
+            # TODO: add check options compatibility (es. schema override norm, log=True and schema doesn't work together)
+            scheme = getattr(mapclassify, scheme)(self.flatten(), ncolors)
+            bins = scheme.bins
+            bounds = [scheme.yb.min()] + scheme.bins.tolist()
+            cm = cmap
+            scheme = cm(1. * np.arange(len(bins)) / len(bins))
+            cmap = colors.ListedColormap(scheme)
+            norm = colors.BoundaryNorm(bounds, len(bins))
+            ticks = bounds
+        
         # if bluemarble:
         #     m.bluemarble()
 
@@ -777,14 +792,15 @@ class RectifiedGrid(SubRectifiedGrid, np.ma.core.MaskedArray):
         # ax.add_feature(cpf.LAKES,   alpha=0.5)
         #
 
+        if countries:
+            ax.add_feature(cpf.BORDERS, linestyle=':', zorder=2)
+
         if coast:
             # ax.add_feature(cpf.COASTLINE)
-            ax.coastlines(resolution='50m')
+            ax.coastlines(resolution=coast_resolution, zorder=3)
 
-        if countries:
-            ax.add_feature(cpf.BORDERS, linestyle=':')
         if rivers:
-            ax.add_feature(cpf.RIVERS)
+            ax.add_feature(cpf.RIVERS, zorder=4)
         if grid:
             # m.drawparallels(np.arange(-90, 90, gridrange), labels=[1, 0, 0, 0], fontsize=10)
             # m.drawmeridians(np.arange(-90, 90, gridrange), labels=[0, 0, 0, 1], fontsize=10)
