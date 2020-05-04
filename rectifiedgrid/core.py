@@ -48,9 +48,13 @@ logger = logging.getLogger(__name__)
 def read_vector(vector, res, column=None, value=1., compute_area=False,
                 dtype=np.float64, eea=False, epsg=None,
                 bounds=None, grid=None, all_touched=True, fillvalue=0.,
-                use_centroid=False):
+                use_centroid=False, query=None):
     logger.debug('Reading vector as geodataframe')
     gdf = GeoDataFrame.from_file(vector)
+    # remove invalid geometries
+    gdf = gdf[~gdf.geometry.isna()].copy()
+    if query is not None:
+        gdf.query(query, inplace=True)
     if use_centroid:
         gdf.geometry = gdf.geometry.centroid
     return read_df(gdf, res, column, value, compute_area,
@@ -703,7 +707,8 @@ class RectifiedGrid(SubRectifiedGrid, np.ma.core.MaskedArray):
                 zoomlevel=2,
                 hillshade=False,
                 scheme=None,
-                ncolors=10
+                ncolors=10,
+                alpha=None
                 ):
 
         cprj = cartopy.crs.Mercator()
@@ -782,7 +787,8 @@ class RectifiedGrid(SubRectifiedGrid, np.ma.core.MaskedArray):
                            cmap=cmap,
                            extent=img_extent,
                            norm=norm,
-                           zorder=1
+                           zorder=1,
+                           alpha=alpha
                            )
 
         # ax.add_feature(cpf.LAND)
