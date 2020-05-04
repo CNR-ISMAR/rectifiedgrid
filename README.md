@@ -22,6 +22,12 @@ Refer to following link for more informations:
 * http://geopandas.org/install.html#installing-with-pip
 * http://toblerity.org/rtree/install.html
 
+If you want to install Shapely dependency from source for compatibility with cartopy or if you want to use a different version of GEOS than the one included in the project wheels you should first install the GEOS library, Cython, and Numpy on your system (using apt, yum, brew, or other means) and then direct pip to ignore the binary wheels.
+
+```shell
+$ pip install shapely --no-binary shapely
+```
+
 Usage
 =====
 

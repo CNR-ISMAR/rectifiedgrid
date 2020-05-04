@@ -852,5 +852,8 @@ class RectifiedGrid(SubRectifiedGrid, np.ma.core.MaskedArray):
             m = ~self.mask
         else:
             m = self != value
-        return self[np.ix_(m.any(1),
-                           m.any(0))]
+        coords = np.argwhere(m)
+        x0, y0 = coords.min(axis=0)
+        x1, y1 = coords.max(axis=0) + 1
+        
+        return self[x0:x1, y0:y1]
