@@ -40,25 +40,25 @@ def calculate_eea_gbounds(bounds, res):
 
 
 def parse_projection(p):
-    """Initialize a pyproj.Proj object.
+    """Initialize a rasterio CRS projection
     """
-    if isinstance(p, pyproj.Proj):
-        return p
+    # if isinstance(p, pyproj.Proj):
+    #     return p
     if isinstance(p, CRS):
-        return pyproj.Proj(p)
+        return p
     elif isinstance(p, int):
-        return pyproj.Proj(init='epsg:{}'.format(p))
+        return CRS.from_epsg(p)
     elif isinstance(p, str):
-        return pyproj.Proj(init=p)
+        return CRS.from_string(p)
     elif isinstance(p, dict):
-        return pyproj.Proj(**p)
-
+        return CRS.from_dict(**p)
 
 def transform(g, from_srs, to_srs):
     project = partial(
         pyproj.transform,
-        parse_projection(from_srs),
-        parse_projection(to_srs))
+        pyproj.Proj(parse_projection(from_srs)),
+        pyproj.Proj(parse_projection(to_srs))
+    )
 
     return ops.transform(project, g)
 

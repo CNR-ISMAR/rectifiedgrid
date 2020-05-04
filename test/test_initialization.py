@@ -1,6 +1,7 @@
 import pytest
 import os
 import pyproj
+from rasterio.crs import CRS
 import rectifiedgrid as rg
 from rectifiedgrid.demo import get_demo_data
 from gisdata import GOOD_DATA
@@ -23,11 +24,11 @@ class TestInitialization(object):
         values = [4326,
                   'epsg:4326',
                   {'init': 'epsg:4326'},
-                  pyproj.Proj(init='epsg:4326')]
+                  ]
 
         for v in values:
             p = rg.parse_projection(v)
-            assert isinstance(p, pyproj.Proj)
+            assert isinstance(p, CRS)
 
     def test_subclassing(self):
         grid = rg.RectifiedGrid([1, 2, 3, 4], 4326, None)
@@ -35,7 +36,7 @@ class TestInitialization(object):
 
         _grid = grid + 1
         assert isinstance(grid, rg.RectifiedGrid)
-        assert _grid.proj.srs == grid.proj.srs
+        assert _grid.crs == grid.crs
 
     def test_read_vector(self):
         vector = os.path.join(GOOD_DATA, 'vector',

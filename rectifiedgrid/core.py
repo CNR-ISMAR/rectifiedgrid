@@ -13,6 +13,7 @@ import cartopy
 import cartopy.feature as cpf
 from cartopy.mpl.gridliner import LONGITUDE_FORMATTER, LATITUDE_FORMATTER
 import cartopy.io.img_tiles as cimgt
+import pyproj
 
 from matplotlib.colors import Normalize, SymLogNorm
 
@@ -67,14 +68,14 @@ def read_df(gdf, res, column=None, value=1., compute_area=False,
             grid=None, all_touched=True, fillvalue=0.):
     if epsg is not None:
         gdf.to_crs(epsg=epsg, inplace=True)
-        proj = parse_projection(epsg)
+        crs = parse_projection(epsg)
     else:
-        proj = parse_projection(gdf.crs)
+        crs = parse_projection(gdf.crs)
 
     if grid is None:
         if bounds is None:
             bounds = gdf.total_bounds
-        grid = _geofactory(bounds, proj, res, dtype, eea)
+        grid = _geofactory(bounds, crs, res, dtype, eea)
     else:
         grid = grid.copy()
     return read_df_like(grid, gdf, column, value, compute_area, copy=False,
@@ -91,7 +92,7 @@ def read_df_like(rgrid, gdf, column=None, value=1., compute_area=False,
         gdf['__rvalue__'] = value
 
     gdf.__rvalue__ = gdf.__rvalue__.fillna(fillvalue)
-    gdf.to_crs(crs=rgrid.crs, inplace=True)
+    gdf.to_crs(crs=rgrid.crs.to_dict(), inplace=True)
 
     features = list(gdf[['geometry', '__rvalue__']].itertuples(index=False,
                                                                name=None))
@@ -102,7 +103,7 @@ def read_df_like(rgrid, gdf, column=None, value=1., compute_area=False,
 
 def read_features(features, res, crs, bounds=None, compute_area=False,
                   dtype=np.float64, eea=False, all_touched=True):
-    proj = parse_projection(crs)
+    crs = parse_projection(crs)
     # guess bounds
     if bounds is None:
         if hasattr(features, 'bounds'):
@@ -110,7 +111,7 @@ def read_features(features, res, crs, bounds=None, compute_area=False,
         else:
             b = np.array([feature[0].bounds for feature in features])
             bounds = np.min(b[:, 0]), np.min(b[:, 1]), np.max(b[:, 2]), np.max(b[:, 3])
-    rgrid = _geofactory(bounds, proj, res, dtype, eea)
+    rgrid = _geofactory(bounds, crs, res, dtype, eea)
     return read_features_like(rgrid, features, compute_area, copy=False,
                               all_touched=all_touched)
 
@@ -134,9 +135,9 @@ def read_raster(raster, masked=True, driver=None):
         src.close()
         raise NotImplementedError('Cannot load a multiband layer')
     if src.crs.is_valid:
-        proj = parse_projection(src.crs)
+        crs = parse_projection(src.crs)
     else:
-        proj = None
+        crs = None
 
     if isinstance(src.transform, Affine):
         _transform = src.transform
@@ -147,12 +148,12 @@ def read_raster(raster, masked=True, driver=None):
         _raster = src.read(1, masked=masked)
         # return _raster
         rgrid = RectifiedGrid(_raster,
-                              proj,
+                              crs,
                               _transform,
                               mask=_raster.mask)
     else:
         rgrid = RectifiedGrid(src.read(1),
-                              proj,
+                              crs,
                               _transform,
                               mask=np.ma.nomask)
     src.close()
@@ -175,7 +176,7 @@ def guess_fill_value(obj):
     return fill_value
 
 
-def _geofactory(bounds, proj, res, dtype=np.float64, eea=False):
+def _geofactory(bounds, crs, res, dtype=np.float64, eea=False):
     if eea:
         gbounds = calculate_eea_gbounds(bounds, res)
     else:
@@ -187,7 +188,7 @@ def _geofactory(bounds, proj, res, dtype=np.float64, eea=False):
     gtransform = Affine.from_gdal(*_gtransform)
     # we use copy=True in order to avoid sharedmask=True
     return RectifiedGrid(np.zeros((rows, cols), dtype),
-                         proj,
+                         crs,
                          gtransform)
 
 
@@ -195,9 +196,9 @@ class SubRectifiedGrid(np.ndarray):
     """Defines a base np.ndarray subclass, that stores rectified grid metadata.
     """
 
-    def __new__(cls, data, proj, gtransform, dtype=None, order=None):
+    def __new__(cls, data, crs, gtransform, dtype=None, order=None):
         obj = np.asanyarray(data, dtype, order).view(cls)
-        obj.proj = copyp.deepcopy(parse_projection(proj))
+        obj.crs = copyp.deepcopy(parse_projection(crs))
         obj.gtransform = copyp.deepcopy(gtransform)
         return obj
 
@@ -206,7 +207,7 @@ class SubRectifiedGrid(np.ndarray):
                             '__array_finalize__', None)):
             super(SubRectifiedGrid, self).__array_finalize__(obj)
 
-        self.proj = copyp.deepcopy(getattr(obj, 'proj', None))
+        self.crs = copyp.deepcopy(getattr(obj, 'crs', None))
         self.gtransform = copyp.deepcopy(getattr(obj, 'gtransform', None))
         # self.proj = getattr(obj, 'proj', None)
         # self.gtransform = getattr(obj, 'gtransform', None)
@@ -214,7 +215,7 @@ class SubRectifiedGrid(np.ndarray):
 
     def copy(self, *args, **kwargs):
         obj = super(SubRectifiedGrid, self).copy(*args, **kwargs)
-        obj.proj = copyp.deepcopy(getattr(self, 'proj', None))
+        obj.crs = copyp.deepcopy(getattr(self, 'crs', None))
         obj.gtransform = copyp.deepcopy(getattr(self, 'gtransform', None))
         return obj
 
@@ -257,11 +258,11 @@ class SubRectifiedGrid(np.ndarray):
 
 class RectifiedGrid(SubRectifiedGrid, np.ma.core.MaskedArray):
     # we use copy=True in order to avoid sharedmask=True
-    def __new__(cls, data, proj, gtransform, mask=np.ma.nomask, copy=True, **kwargs):
-        subarr = SubRectifiedGrid(data, proj, gtransform)
+    def __new__(cls, data, crs, gtransform, mask=np.ma.nomask, copy=True, **kwargs):
+        subarr = SubRectifiedGrid(data, crs, gtransform)
         _data = np.ma.core.MaskedArray.__new__(cls, data=subarr,
                                                mask=mask, copy=copy, **kwargs)
-        _data.proj = subarr.proj
+        _data.crs = subarr.crs
         _data.gtransform = subarr.gtransform
         return _data
 
@@ -344,7 +345,7 @@ class RectifiedGrid(SubRectifiedGrid, np.ma.core.MaskedArray):
         """Grid bounds in longitude - latitude (espg:4326).
         """
         gbounds_bbox = box(*self.bounds)
-        return transform(gbounds_bbox, self.proj, "epsg:4326").bounds
+        return transform(gbounds_bbox, self.crs, parse_projection("epsg:4326")).bounds
 
     @property
     def geollur(self):
@@ -353,66 +354,9 @@ class RectifiedGrid(SubRectifiedGrid, np.ma.core.MaskedArray):
 
         p_ll = Point(*ll)
         p_ur = Point(*ur)
-        ll = transform(p_ll, self.proj, parse_projection("epsg:4326"))
-        ur = transform(p_ur, self.proj, parse_projection("epsg:4326"))
+        ll = transform(p_ll, self.crs, parse_projection("epsg:4326"))
+        ur = transform(p_ur, self.crs, parse_projection("epsg:4326"))
         return ll.x, ll.y, ur.x, ur.y
-
-    @property
-    def crs(self):
-        """
-        Converts the pyproj.CRS to dictionary
-        .. warning:: this was copy by dev version of pyproj (pyproj,CRS.to_dic).
-        .. Use directly CRS.to_dict method when released
-        Returns
-        -------
-        dict: PROJ params in dict format.
-        """
-
-        def parse(val):
-            if val.lower() == "true":
-                return True
-            elif val.lower() == "false":
-                return False
-            try:
-                return int(val)
-            except ValueError:
-                pass
-            try:
-                return float(val)
-            except ValueError:
-                pass
-            val_split = val.split(",")
-            if len(val_split) > 1:
-                val = [float(sval.strip()) for sval in val_split]
-            return val
-
-        items = map(
-            lambda kv: len(kv) == 2 and (kv[0], parse(kv[1])) or (kv[0], None),
-            (
-                part.lstrip("+").split("=", 1)
-                for part in self.proj.crs.to_proj4().strip().split()
-            ),
-        )
-        crs_dict = {key: value for key, value in items if value is not False}
-        return crs_dict
-
-        # crs = {}
-        # if not self.proj:
-        #     return crs
-        # for item in self.proj.srs.split():
-        #
-        #    kv = item.split('=')
-        #
-        #   try:
-        #       v = int(v)
-        #    except ValueError:
-        #        pass
-        #    if v == 'True':
-        #        v = True
-        #    elif v == 'False':
-        #        v = False
-        #    crs[k.replace('+', '')] = v
-        # return crs
 
     def write_raster(self, filepath, dtype=None, driver='GTiff', nodata=None, compress=None):
         """Write a raster file
@@ -426,7 +370,7 @@ class RectifiedGrid(SubRectifiedGrid, np.ma.core.MaskedArray):
 
         profile = {
             'count': count,
-            'crs': self.crs,
+            'crs': self.crs.to_dict(),
             'driver': driver,
             'dtype': dtype,
             # 'nodata': 0,
@@ -605,14 +549,14 @@ class RectifiedGrid(SubRectifiedGrid, np.ma.core.MaskedArray):
 
         # dst_shape = rgrid.shape
         dst_transform = rgrid.gtransform
-        dst_crs = rgrid.crs
+        dst_crs = rgrid.crs.to_dict()
         destination = rgrid.astype(self.dtype).copy()
         reproject(
             source,
             destination=destination,
             src_transform=self.gtransform,
             src_nodata=src_nodata,
-            src_crs=self.crs,
+            src_crs=self.crs.to_dict(),
             dst_transform=dst_transform,
             dst_crs=dst_crs,
             resampling=resampling,
@@ -623,7 +567,7 @@ class RectifiedGrid(SubRectifiedGrid, np.ma.core.MaskedArray):
 
     def to_srs(self, srs, resolution=None, src_nodata=None, dst_nodata=None,
                resampling=Resampling.bilinear):
-        affine, width, height = calculate_default_transform(self.crs,
+        affine, width, height = calculate_default_transform(self.crs.to_dict(),
                                                             srs,
                                                             self.shape[1],
                                                             self.shape[0],
@@ -649,13 +593,13 @@ class RectifiedGrid(SubRectifiedGrid, np.ma.core.MaskedArray):
             raster = self.copy()
         dst_shape = self.shape
         dst_transform = self.gtransform
-        dst_crs = self.crs
+        dst_crs = self.crs.to_dict()
         destination = np.zeros(dst_shape, input_raster.dtype)
         reproject(
             input_raster,
             destination,
             src_transform=input_raster.gtransform,
-            src_crs=input_raster.crs,
+            src_crs=input_raster.crs.to_dict(),
             dst_transform=dst_transform,
             dst_crs=dst_crs,
             resampling=resampling,
@@ -676,7 +620,7 @@ class RectifiedGrid(SubRectifiedGrid, np.ma.core.MaskedArray):
 
     def get_basemap(self, ax=None):
         minx, miny, maxx, maxy = self.geollur
-        epsg = self.crs['init'].split(':')[1]
+        epsg = self.crs.to_dict()['init'].split(':')[1]
         return basemap.Basemap(
             llcrnrlon=minx, llcrnrlat=miny, urcrnrlon=maxx, urcrnrlat=maxy,
             resolution='h',
