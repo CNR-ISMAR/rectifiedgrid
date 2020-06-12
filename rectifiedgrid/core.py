@@ -70,6 +70,9 @@ def read_df(gdf, res, column=None, value=1., compute_area=False,
         gdf.to_crs(epsg=epsg, inplace=True)
         crs = parse_projection(epsg)
     else:
+        # TODO: following error occours when projection is parsed from gdf
+        # AttributeError: 'NoneType' object has no attribute 'to_dict'
+        # gdf.to_crs(crs=rgrid.crs.to_dict(), inplace=True)
         crs = parse_projection(gdf.crs)
 
     if grid is None:
@@ -129,12 +132,14 @@ def read_features_like(rgrid, features, compute_area=False, copy=True, all_touch
     return raster
 
 
-def read_raster(raster, masked=True, driver=None):
+def read_raster(raster, masked=True, driver=None, epsg=None):
     src = rasterio.open(raster, driver=driver)
     if src.count > 1:
         src.close()
         raise NotImplementedError('Cannot load a multiband layer')
-    if src.crs.is_valid:
+    if epsg is not None:
+        crs = parse_projection(epsg)
+    elif src.crs.is_valid:
         crs = parse_projection(src.crs)
     else:
         crs = None
