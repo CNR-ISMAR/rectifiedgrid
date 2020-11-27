@@ -5,6 +5,7 @@ from rasterio.crs import CRS
 import rectifiedgrid as rg
 from rectifiedgrid.demo import get_demo_data
 from gisdata import GOOD_DATA
+import pandas as pd
 from shapely import geometry
 import numpy as np
 from scipy import ndimage
@@ -69,8 +70,8 @@ class TestInitialization(object):
 
     def test_feature(self):
         grid = get_demo_data('line3035')
-        assert grid.shape == (12, 10)
-        assert grid.sum() == 21
+        assert grid.shape == (15, 9)
+        assert grid.sum() == 22
 
     def test_masked_value(self):
         grid = get_demo_data()
@@ -80,13 +81,10 @@ class TestInitialization(object):
     def test_reproject(self):
         grid4326 = get_demo_data('line4326')
         grid3035 = get_demo_data('line3035')
-        rgrid = np.zeros_like(grid3035)
-        assert rgrid.proj.srs == grid3035.proj.srs
-        assert (rgrid.max(), rgrid.min()) == (0., 0.)
-        rgrid.reproject(grid4326, Resampling.nearest)
-        assert rgrid.max() == 1.
-        # print "############", rgrid.mean()
-        assert np.round(rgrid.mean(), 2) == 0.16
+        grid3035_4326 = grid3035.to_srs('epsg:4326', resampling=Resampling.nearest)
+        assert grid4326.crs == grid3035_4326.crs
+        assert (grid3035_4326.max(), grid3035_4326.min()) == (1., 0.)
+        assert np.round(grid3035_4326.mean(), 2) == 0.15
 
     def test_patch(self):
         grid1 = get_demo_data('rg9x9')
@@ -111,3 +109,6 @@ class TestInitialization(object):
         file_path = os.path.join(TESTDATA_DIR, 'wrong_fill_value.tiff')
         grid = rg.read_raster(str(file_path))
         assert (grid.fill_value == 32767)
+
+    def test_read_df(self):
+        df = pd.DataFrame
