@@ -1,9 +1,12 @@
+from distutils.version import LooseVersion
 import pandas as pd
 import pyproj
 import math
 from shapely import ops
 from functools import partial
 from rasterio.crs import CRS
+import rasterio
+from pyproj.enums import WktVersion
 from matplotlib.colors import LinearSegmentedColormap
 
 EEA_GRID_RESOLUTIONS = [25, 50, 100, 250, 500, 1000, 2500, 5000, 10000, 25000, 100000]
@@ -52,6 +55,12 @@ def parse_projection(p):
         return CRS.from_string(p)
     elif isinstance(p, dict):
         return CRS.from_dict(**p)
+    elif isinstance(p, pyproj.CRS):
+        if LooseVersion(rasterio.__gdal_version__) < LooseVersion("3.0.0"):
+            return rasterio.crs.CRS.from_wkt(p.to_wkt(WktVersion.WKT1_GDAL))
+        else:
+            return rasterio.crs.CRS.from_wkt(p.to_wkt())
+
 
 def transform(g, from_srs, to_srs):
     project = partial(

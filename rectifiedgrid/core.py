@@ -70,9 +70,6 @@ def read_df(gdf, res, column=None, value=1., compute_area=False,
         gdf.to_crs(epsg=epsg, inplace=True)
         crs = parse_projection(epsg)
     else:
-        # TODO: following error occours when projection is parsed from gdf
-        # AttributeError: 'NoneType' object has no attribute 'to_dict'
-        # gdf.to_crs(crs=rgrid.crs.to_dict(), inplace=True)
         crs = parse_projection(gdf.crs)
 
     if grid is None:
@@ -95,7 +92,8 @@ def read_df_like(rgrid, gdf, column=None, value=1., compute_area=False,
         gdf['__rvalue__'] = value
 
     gdf.__rvalue__ = gdf.__rvalue__.fillna(fillvalue)
-    gdf.to_crs(crs=rgrid.crs.to_dict(), inplace=True)
+    proj_crs = pyproj.CRS.from_user_input(rgrid.crs)
+    gdf.to_crs(crs=proj_crs, inplace=True)
 
     features = list(gdf[['geometry', '__rvalue__']].itertuples(index=False,
                                                                name=None))
@@ -588,7 +586,7 @@ class RectifiedGrid(SubRectifiedGrid, np.ma.core.MaskedArray):
         return self.to_srs_like(destination, src_nodata,
                                 dst_nodata, resampling)
 
-    # TODO deal nodata
+    # TODO deal nodata. This should be deprecated
     def reproject(self, input_raster, resampling=Resampling.bilinear, copy=False):
         """Reproject the input_raster using the current grid projection,
         resolution and extension
