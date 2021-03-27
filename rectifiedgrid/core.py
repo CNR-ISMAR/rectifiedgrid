@@ -95,7 +95,7 @@ def read_df_like(rgrid, gdf, column=None, value=1., compute_area=False,
     proj_crs = pyproj.CRS.from_user_input(rgrid.crs)
     gdf.to_crs(crs=proj_crs, inplace=True)
 
-    features = list(gdf[['geometry', '__rvalue__']].itertuples(index=False,
+    features = list(gdf[[gdf.geometry.name, '__rvalue__']].itertuples(index=False,
                                                                name=None))
 
     return read_features_like(rgrid, features, compute_area=compute_area,
@@ -710,7 +710,7 @@ class RectifiedGrid(SubRectifiedGrid, np.ma.core.MaskedArray):
             cmap = colors.ListedColormap(scheme)
             norm = colors.BoundaryNorm(bounds, len(bins))
             ticks = bounds
-        
+
         # if bluemarble:
         #     m.bluemarble()
 
@@ -802,5 +802,5 @@ class RectifiedGrid(SubRectifiedGrid, np.ma.core.MaskedArray):
         coords = np.argwhere(m)
         x0, y0 = coords.min(axis=0)
         x1, y1 = coords.max(axis=0) + 1
-        
+
         return self[x0:x1, y0:y1]
