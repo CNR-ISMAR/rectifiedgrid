@@ -8,7 +8,7 @@ def read(fname):
 
 setup(
     name="rectifiedgrid",  # or RectifiedGrid
-    version="1.0.1",
+    version="1.1.0",
     author="Stefano Menegon",
     author_email="ste.menegon@gmail.com",
     description="RectifiedGrid is a python module to deal with rectified grid.",
@@ -32,7 +32,8 @@ setup(
         'rtree',
         'pandas',
         # utils
-        'affine', 'matplotlib', 'cartopy'
+        'affine', 'matplotlib', 'cartopy',
+        'mapclassify'
     ],
     classifiers=[
         "Development Status :: 5 - Production/Stable",
