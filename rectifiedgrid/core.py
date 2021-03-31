@@ -658,11 +658,13 @@ class RectifiedGrid(SubRectifiedGrid, np.ma.core.MaskedArray):
                 alpha=None
                 ):
 
-        cprj = cartopy.crs.Mercator()
         if ax is None:
+            cprj = cartopy.crs.Mercator()
             ax = plt.gca(projection=cprj)
         elif not hasattr(ax, "projection"):
             raise AttributeError("Passed axes doesn't have projection attribute")
+
+        cprj = ax.projection
 
         r = self.to_srs(cprj.proj4_params, resampling=Resampling.bilinear)
 
