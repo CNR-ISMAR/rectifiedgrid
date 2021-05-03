@@ -95,7 +95,7 @@ def read_df_like(rgrid, gdf, column=None, value=1., compute_area=False,
     proj_crs = pyproj.CRS.from_user_input(rgrid.crs)
     gdf.to_crs(crs=proj_crs, inplace=True)
 
-    features = list(gdf[[gdf.geometry.name, '__rvalue__']].itertuples(index=False,
+    features = list(gdf[['geometry', '__rvalue__']].itertuples(index=False,
                                                                name=None))
 
     return read_features_like(rgrid, features, compute_area=compute_area,
@@ -663,11 +663,7 @@ class RectifiedGrid(SubRectifiedGrid, np.ma.core.MaskedArray):
             ax = plt.gca(projection=cprj)
         elif not hasattr(ax, "projection"):
             raise AttributeError("Passed axes doesn't have projection attribute")
-
-        cprj = ax.projection
-
-        r = self.to_srs(cprj.proj4_params, resampling=Resampling.bilinear)
-
+        r = self.to_srs(ax.projection.proj4_params, resampling=Resampling.bilinear)
         img_extent = [r.bounds[0],
                       r.bounds[2],
                       r.bounds[1],
@@ -712,7 +708,7 @@ class RectifiedGrid(SubRectifiedGrid, np.ma.core.MaskedArray):
             cmap = colors.ListedColormap(scheme)
             norm = colors.BoundaryNorm(bounds, len(bins))
             ticks = bounds
-
+        
         # if bluemarble:
         #     m.bluemarble()
 
@@ -730,7 +726,6 @@ class RectifiedGrid(SubRectifiedGrid, np.ma.core.MaskedArray):
             r = get_hs(r, cmap, norm=norm,
                        # blend_mode='soft'
                        )
-
         mapimg = ax.imshow(r,
                            origin='upper',
                            cmap=cmap,
@@ -773,7 +768,7 @@ class RectifiedGrid(SubRectifiedGrid, np.ma.core.MaskedArray):
             else:
                 plt.colorbar(mapimg, orientation='vertical', ax=ax, ticks=ticks)
 
-        ax.set_extent(img_extent, crs=cprj)
+        ax.set_extent(img_extent, crs=ax.projection)
         return ax, mapimg
 
     def griddata(self, x, y, z, method='nearest', copy=False):
@@ -804,5 +799,5 @@ class RectifiedGrid(SubRectifiedGrid, np.ma.core.MaskedArray):
         coords = np.argwhere(m)
         x0, y0 = coords.min(axis=0)
         x1, y1 = coords.max(axis=0) + 1
-
+        
         return self[x0:x1, y0:y1]
