@@ -33,6 +33,7 @@ import matplotlib.pyplot as plt
 from matplotlib import colors
 from matplotlib.ticker import LogFormatter
 import mapclassify
+from rasterio.enums import MergeAlg
 
 BASEMAP = False
 
@@ -83,7 +84,8 @@ def read_df(gdf, res, column=None, value=1., compute_area=False,
 
 
 def read_df_like(rgrid, gdf, column=None, value=1., compute_area=False,
-                 copy=True, all_touched=True, fillvalue=0.):
+                 copy=True, all_touched=True, fillvalue=0.,
+                 merge_alg=MergeAlg.replace):
     """
     """
     if column is not None:
@@ -99,7 +101,7 @@ def read_df_like(rgrid, gdf, column=None, value=1., compute_area=False,
                                                                name=None))
 
     return read_features_like(rgrid, features, compute_area=compute_area,
-                              copy=copy, all_touched=all_touched)
+                              copy=copy, all_touched=all_touched, merge_alg=merge_alg)
 
 
 def read_features(features, res, crs, bounds=None, compute_area=False,
@@ -117,7 +119,7 @@ def read_features(features, res, crs, bounds=None, compute_area=False,
                               all_touched=all_touched)
 
 
-def read_features_like(rgrid, features, compute_area=False, copy=True, all_touched=True):
+def read_features_like(rgrid, features, compute_area=False, copy=True, all_touched=True, merge_alg=MergeAlg.replace):
     if copy:
         raster = rgrid.copy()
     else:
@@ -126,7 +128,7 @@ def read_features_like(rgrid, features, compute_area=False, copy=True, all_touch
     if compute_area:
         raster.rasterize_features_area(features)
     else:
-        raster.rasterize_features(features, all_touched=all_touched)
+        raster.rasterize_features(features, all_touched=all_touched, merge_alg=merge_alg)
     return raster
 
 
@@ -279,14 +281,15 @@ class RectifiedGrid(SubRectifiedGrid, np.ma.core.MaskedArray):
         """Area of a grid cell"""
         return self.resolution * self.resolution
 
-    def rasterize_features(self, features, mode='replace', all_touched=True):
+    def rasterize_features(self, features, mode='replace', all_touched=True, merge_alg=MergeAlg.replace):
         """
         """
         _array = rasterize(features,
                            fill=0,
                            transform=self.gtransform,
                            out_shape=self.shape,
-                           all_touched=all_touched)
+                           all_touched=all_touched,
+                           merge_alg=merge_alg)
         if mode == 'replace':
             self[:] = _array
         elif mode == 'patch':
