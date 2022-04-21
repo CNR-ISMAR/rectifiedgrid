@@ -1,4 +1,3 @@
-from distutils.version import LooseVersion
 import pandas as pd
 import pyproj
 import math
@@ -56,9 +55,6 @@ def parse_projection(p):
     elif isinstance(p, dict):
         return CRS.from_dict(**p)
     elif isinstance(p, pyproj.CRS):
-        if LooseVersion(rasterio.__gdal_version__) < LooseVersion("3.0.0"):
-            return rasterio.crs.CRS.from_wkt(p.to_wkt(WktVersion.WKT1_GDAL))
-        else:
             return rasterio.crs.CRS.from_wkt(p.to_wkt())
 
 
