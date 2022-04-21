@@ -262,10 +262,16 @@ class RgAccessor:
 
     def rescale(self):
         raster = self._obj.copy()
-        maxval = np.nanmax(raster.values)
+        maxval = raster.max().values
         if maxval != 0:
             raster.values[:] = (raster.values / maxval)[:]
         return raster
+
+    def min(self):
+        return self._obj.min().values
+
+    def max(self):
+        return self._obj.max().values
 
     def gaussian_conv(self, geosigma, mode="constant",
                       **kwargs):
@@ -322,7 +328,9 @@ class RgAccessor:
             ax = plt.gca(projection=cprj)
         elif not hasattr(ax, "projection"):
             raise AttributeError("Passed axes doesn't have projection attribute")
-        r = self._obj.rio.reproject(ax.projection.proj4_params, resampling=Resampling.bilinear)
+        r = self._obj.rio.reproject(ax.projection.proj4_params,
+                                    resampling=Resampling.bilinear,
+                                    nodata=np.nan)
         bounds = r.rio.bounds()
         img_extent = [bounds[0],
                       bounds[2],
@@ -388,7 +396,7 @@ class RgAccessor:
         #                 vmin=vmin, vmax=vmax)
 
         if hillshade:
-            r = get_hs(r, cmap, norm=norm,
+            r = get_hs(r.values, cmap, norm=norm,
                        # blend_mode='soft'
                        )
         mapimg = ax.imshow(r,
@@ -435,3 +443,11 @@ class RgAccessor:
 
         ax.set_extent(img_extent_buffer, crs=ax.projection)
         return ax, mapimg
+
+    def crop(self, value=np.nan):
+        # TODO: improve use of isnull and novalue
+        raster = self._obj.copy().fillna(value)
+        rcrop = raster.where(raster != value, drop=True)
+        minx, miny, maxx, maxy = rcrop.rio.bounds()
+        return raster.rio.clip_box(minx=minx, maxx=maxx,
+                                   miny=miny, maxy=maxy).where(~self._obj.isnull())
