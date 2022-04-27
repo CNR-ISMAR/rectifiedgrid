@@ -8,7 +8,7 @@ def read(fname):
 
 setup(
     name="rectifiedgrid",  # or RectifiedGrid
-    version="2.0.2",
+    version="2.0.3",
     author="Stefano Menegon",
     author_email="ste.menegon@gmail.com",
     description="RectifiedGrid is a python module to deal with rectified grid.",
