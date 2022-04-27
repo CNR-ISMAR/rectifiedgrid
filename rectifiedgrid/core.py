@@ -337,7 +337,7 @@ class RgAccessor:
     def gaussian_filter(self, sigma, mode="constant", # copy=False,
                         **kwargs):
         # sigma order: x, y[, z]
-        if len(sigma)==1:
+        if isinstance(sigma, int) or isinstance(sigma, float) or len(sigma)==1:
             _sigma = sigma
         elif len(sigma)==2:
             _sigma = [sigma[1], sigma[0]]
