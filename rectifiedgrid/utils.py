@@ -1,3 +1,4 @@
+import numpy as np
 import pandas as pd
 import pyproj
 import math
@@ -29,14 +30,12 @@ def calculate_gbounds(bounds, res):
     return gbounds
 
 
-def calculate_eea_gbounds(bounds, res):
-    if res not in EEA_GRID_RESOLUTIONS:
-        raise ValueError("The EEA Reference Grid doesn't support the resolution {}".format(res))
+def calculate_rounded_gbounds(bounds, res):
     gbounds = [
-        int(bounds[0] / res) * res,
-        int(bounds[1] / res) * res,
-        int(bounds[2] / res) * res + res,
-        int(bounds[3] / res) * res + res,
+        np.floor(bounds[0] / res) * res,
+        np.floor(bounds[1] / res) * res,
+        np.ceil(bounds[2] / res) * res,
+        np.ceil(bounds[3] / res) * res,
     ]
     return gbounds
 

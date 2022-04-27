@@ -56,9 +56,9 @@ class TestInitialization(object):
         grid = rg.read_raster(raster)
         assert grid.shape == (7, 5)
 
-    def test_eea(self):
+    def test_rounded_bounds(self):
         vector = os.path.join(os.path.dirname(__file__), 'air.shp')
-        grid = rg.read_vector(vector, res=10000, eea=True,
+        grid = rg.read_vector(vector, res=10000, rounded_bounds=True,
                               epsg=3035)
         assert grid.rio.bounds() == (4490000, 1520000, 5490000, 2530000)
 

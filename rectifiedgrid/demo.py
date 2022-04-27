@@ -55,7 +55,7 @@ def get_demo_data(name='default'):
         raster = array_to_rg(arr2, epsg, gtransform)
     elif name == 'line3035':
         features = df_lstring.to_crs("epsg:3035")[['geometry', 'value']].values.tolist()
-        raster = rg.read_features(features, 10000, 3035, eea=True)
+        raster = rg.read_features(features, 10000, 3035, rounded_bounds=True)
     elif name == 'line4326':
         features = df_lstring[['geometry', 'value']].values.tolist()
         raster = rg.read_features(features, 0.1, 4326)

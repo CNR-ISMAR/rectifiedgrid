@@ -6,7 +6,7 @@ from rioxarray.rioxarray import affine_to_coords
 import xarray
 import numpy as np
 import geopandas as gpd
-from .utils import calculate_gbounds, calculate_eea_gbounds, parse_projection, transform
+from .utils import calculate_gbounds, calculate_rounded_gbounds, parse_projection, transform
 from .hillshade import get_hs
 from affine import Affine
 from rasterio.features import rasterize
@@ -40,13 +40,13 @@ logger = logging.getLogger(__name__)
 
 # TODO: check mandatory options (eg. res or grid have to be not None
 def read_vector(vector, res=None, column=None, value=1., compute_area=False,
-                dtype=np.float64, eea=False, epsg=None,
+                dtype=np.float64, rounded_bounds=False, epsg=None,
                 bounds=None,
                 grid=None, grid_mask=True,
                 all_touched=True, merge_alg=rasterio.enums.MergeAlg.replace, fillvalue=0., nodata=np.nan,
                 use_centroid=False, query=None):
     """
-    Constructor to create an xarray object from a vector file with input geometry burned in.
+    Constructor to create a geospatial DataArray object from a vector file with input geometry burned in.
 
     Parameters
     ----------
@@ -61,8 +61,8 @@ def read_vector(vector, res=None, column=None, value=1., compute_area=False,
         Ignored, Deprecated
     dtype: rasterio or numpy data type, optional
         Used as data type for results.
-    eea: bool, optional
-        If True, coordinates of the result xarray object are aligned to EEA reference grid.
+    rounded_bounds: bool, optional
+        If True, bounds of the result xarray object are adjusted to result in round numbers.
     epsg: int, optional
         EPSG code specifying output projection. If None, projection of the input file will be used.
     bounds: list or tuple
@@ -108,14 +108,14 @@ def read_vector(vector, res=None, column=None, value=1., compute_area=False,
     if use_centroid:
         gdf.geometry = gdf.geometry.centroid
     return read_df(gdf, res, column, value, compute_area,
-                   dtype, eea, epsg, bounds,
+                   dtype, rounded_bounds, epsg, bounds,
                    grid=grid, grid_mask=grid_mask,
                    all_touched=all_touched, merge_alg=merge_alg, fillvalue=fillvalue,
                    nodata=nodata)
 
 # TODO: merge read_df and read_df_link (as in read_vector)
 def read_df(gdf, res=None, column=None, value=1., compute_area=False,
-            dtype=np.float64, eea=False, epsg=None, bounds=None,
+            dtype=np.float64, rounded_bounds=False, epsg=None, bounds=None,
             grid=None, grid_mask=True,
             all_touched=True, merge_alg=rasterio.enums.MergeAlg.replace, fillvalue=0.,
             nodata=np.nan):
@@ -128,7 +128,7 @@ def read_df(gdf, res=None, column=None, value=1., compute_area=False,
     if grid is None:
         if bounds is None:
             bounds = gdf.total_bounds
-        grid = make_array(bounds, crs, res, dtype=dtype, eea=eea, nodata=nodata)
+        grid = make_array(bounds, crs, res, dtype=dtype, rounded_bounds=rounded_bounds, nodata=nodata)
     else:
         grid = grid.copy()
     return read_df_like(grid, gdf, column, value, compute_area, copy=False,
@@ -164,7 +164,7 @@ def read_df_like(rgrid, gdf, column=None, value=1., compute_area=False,
 
 # TODO: merge read_features ad read_features_like as in read_vector
 def read_features(features, res, crs, bounds=None, compute_area=False,
-                  dtype=np.float64, eea=False,
+                  dtype=np.float64, rounded_bounds=False,
                   all_touched=True, merge_alg=rasterio.enums.MergeAlg.replace, fillvalue=0.,
                   nodata=np.nan,
                   grid_mask=True):
@@ -176,7 +176,7 @@ def read_features(features, res, crs, bounds=None, compute_area=False,
         else:
             b = np.array([feature[0].bounds for feature in features])
             bounds = np.min(b[:, 0]), np.min(b[:, 1]), np.max(b[:, 2]), np.max(b[:, 3])
-    rgrid = make_array(bounds, crs, res, dtype=dtype, eea=eea, nodata=nodata)
+    rgrid = make_array(bounds, crs, res, dtype=dtype, rounded_bounds=rounded_bounds, nodata=nodata)
     return read_features_like(rgrid, features, compute_area, copy=False,
                               all_touched=all_touched, merge_alg=merge_alg, fillvalue=fillvalue,
                               grid_mask=grid_mask)
@@ -235,9 +235,9 @@ def rasterize_features(da, features, all_touched=True, merge_alg=rasterio.enums.
         return da_r.where(~da.isnull())
     return da_r
 
-def make_array(bounds=None, crs=None, res=None, dtype=np.float64, eea=False, nodata=np.nan):
-    if eea:
-        gbounds = calculate_eea_gbounds(bounds, res)
+def make_array(bounds=None, crs=None, res=None, dtype=np.float64, rounded_bounds=False, nodata=np.nan):
+    if rounded_bounds:
+        gbounds = calculate_rounded_gbounds(bounds, res)
     else:
         gbounds = calculate_gbounds(bounds, res)
 
