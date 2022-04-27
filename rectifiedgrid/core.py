@@ -208,6 +208,8 @@ def make_array(bounds=None, crs=None, res=None, dtype=np.float64, eea=False, nod
 
 @xarray.register_dataarray_accessor("rg")
 class RgAccessor:
+    resolution_z = None
+
     def __init__(self, xarray_obj):
         self._obj = xarray_obj
 
@@ -275,16 +277,28 @@ class RgAccessor:
 
     def gaussian_conv(self, geosigma, mode="constant",
                       **kwargs):
-        # TODO: check if the geosigma order is aligned to resolution order (for array geosigma)
-        sigma = np.array(geosigma) / np.abs(np.array(self._obj.rio.resolution()))
+        # geosigma order: x, y[, z]
+        _res = self._obj.rg.resolution2d3d()
+        sigma = (np.array(geosigma) /
+                 np.abs(np.array(_res))
+                 )
         return self.gaussian_filter(sigma,
                                     mode=mode,
                                     **kwargs)
 
     def gaussian_filter(self, sigma, mode="constant", # copy=False,
                         **kwargs):
-        _kwargs = dict(kwargs, sigma=sigma, mode=mode)
+        # sigma order: x, y[, z]
+        if len(sigma)==1:
+            _sigma = sigma
+        elif len(sigma)==2:
+            _sigma = [sigma[1], sigma[0]]
+        else:
+            _sigma = [sigma[2], sigma[1], sigma[0]]
+        print(_sigma)
+        _kwargs = dict(kwargs, sigma=_sigma, mode=mode)
         rgauss = xarray.apply_ufunc(ndimage.gaussian_filter,
+                                    # align dimension to sigma
                                     self._obj.fillna(0),
                                     # input_core_dims=[[]],
                                     # output_core_dims=[[]],
@@ -451,3 +465,90 @@ class RgAccessor:
         minx, miny, maxx, maxy = rcrop.rio.bounds()
         return raster.rio.clip_box(minx=minx, maxx=maxx,
                                    miny=miny, maxy=maxy).where(~self._obj.isnull())
+
+    def resolution_z(self):
+        minz = float(self._obj['z'][0])
+        maxz = float(self._obj['z'][-1])
+        sizez = self._obj['z'].size
+        return (maxz - minz)/(sizez - 1)
+
+    def resolution2d3d(self):
+        if 'z' in self._obj.dims:
+            return (
+                self._obj.rio.resolution()
+                + (self.resolution_z(),)
+            )
+        else:
+            return self._obj.rio.resolution()
+
+    def to_3d(self, top_surface=None, bottom_surface=None,
+              top=None, bottom=None, resolution_z=1, num=None,
+              mode="full", top_layer=5, bottom_layer=5):
+        if (top_surface is None and top is None):
+            raise ValueError('Neither "top_surface" nor "top" have a valid value.')
+        if (bottom_surface is None and bottom is None):
+            raise ValueError('Neither "bottom_surface" nor "bottom" have a valid value.')
+        if (resolution_z is None and num is None):
+            raise ValueError('Neither "resolution_z" nor "num" have a valid value.')
+        raster = self._obj
+
+        if top is not None:
+           zmax = float(top)
+           top_surface = raster.where(raster.isnull(), top)
+        else:
+            top_surface = (top_surface
+                           .rio.reproject_match(raster, nodata=np.nan)
+                           .where(~raster.isnull())
+                           )
+            zmax = top_surface.max().values
+
+        if bottom is not None:
+            zmin = float(bottom)
+            bottom_surface = raster.where(raster.isnull(), bottom)
+        else:
+            bottom_surface = (bottom_surface
+                              .rio.reproject_match(raster, nodata=np.nan)
+                              .where(~raster.isnull())
+                              )
+            zmin = float(bottom_surface.min())
+
+        if resolution_z is not None:
+            # align coordinates around zero
+            _zmin = np.floor(zmin / resolution_z) * resolution_z
+            _zmax = np.ceil(zmax / resolution_z) * resolution_z
+            coords = np.arange(_zmin, _zmax, resolution_z) + resolution_z/2.
+        else:
+            coords, resolution_z = np.linspace(zmin, zmax, num+1, retstep=True)
+            coords = coords[:-1] + resolution_z / 2
+
+        top_surface_z = top_surface.expand_dims({'z': coords})
+        bottom_surface_z = bottom_surface.expand_dims({'z': coords})
+        r = (raster.expand_dims({'z': coords})
+             .where((bottom_surface_z <= bottom_surface_z.z) & (top_surface_z >= top_surface_z.z))
+             )
+        if mode == 'full':
+            pass
+        elif mode == 'top':
+            r = r.where((r.isnull()) | (r.z >= top_surface_z-top_layer), 0)
+        elif mode == 'bottom':
+            r = r.where((r.isnull()) | (r.z <= bottom_surface_z+bottom_layer), 0)
+        elif mode == 'middle':
+            r = (r.where((r.isnull())
+                         | ((r.z < top_surface_z-top_layer)
+                            & (r.z > bottom_surface_z+bottom_layer)
+                            ),
+                         0)
+                 )
+
+        z_coord_attrs = dict(r.coords['z'].attrs)
+        z_coord_attrs["axis"] = "Z"
+        z_coord_attrs["long_name"] = "height"
+        z_coord_attrs["standard_name"] = "height_above_mean_sea_level"
+        z_coord_attrs["units"] = "metre"
+        z_coord_attrs["positive"] = "up"
+        r.coords['z'].attrs = z_coord_attrs
+
+        return r
+
+
+#%%
