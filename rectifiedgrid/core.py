@@ -45,6 +45,60 @@ def read_vector(vector, res=None, column=None, value=1., compute_area=False,
                 grid=None, grid_mask=True,
                 all_touched=True, merge_alg=rasterio.enums.MergeAlg.replace, fillvalue=0., nodata=np.nan,
                 use_centroid=False, query=None):
+    """
+    Constructor to create an xarray object from a vector file with input geometry burned in.
+
+    Parameters
+    ----------
+    vector: :str
+        File path or file handle to read from. See Geopandas.from_file for usage details.
+    res: float
+        Resolution of the output object expressed in the destination coordinate reference system.
+    column: str, optional
+        Attribute field of the input file from which the values should be chosen. If column=None, the 'value' parameter
+        is used. Only numeric column are supported.
+    compute_area: bool, optional
+        Ignored, Deprecated
+    dtype: rasterio or numpy data type, optional
+        Used as data type for results.
+    eea: bool, optional
+        If True, coordinates of the result xarray object are aligned to EEA reference grid.
+    epsg: int, optional
+        EPSG code specifying output projection. If None, projection of the input file will be used.
+    bounds: list or tuple
+        minx, miny, maxx, maxy values containing the bounds of the result array. Bound will be slightly adjusted to meet
+        the resolution.
+    grid: xarray, optional
+        The shape and the geopsatial attributes of grid define the same attributes of the returned xarray.
+    grid_mask: bool, optional
+        Ignore, Deprecated
+    all_touched: bool, optional
+        If True, all pixels touched by geometries will be burned in.
+        See rasterio.features.rasterize for usage details.
+    merge_alg: MergeAlg, optional
+        Merge algorithm to use. One of:
+            MergeAlg.replace (default):
+                the new value will overwrite the existing value.
+            MergeAlg.add:
+                the new value will be added to the existing raster.
+        See rasterio.features.rasterize for usage details.
+    fillvalue: int or float, optional
+        Used as fill value for all areas not covered by input geometries.
+        See rasterio.features.rasterize for usage details.
+    nodata: float, optional
+        Nodata value for the DataArray.
+        See rioxarray.write_nodata for usage details.
+    use_centroid: bool, optional
+        If True, centroid of polygonal geometries will be burned in.
+    query: str, optional
+        The query string to evaluate for filtering the data before burning.
+        See pandas.DataFrame.query for usage details.
+
+    Returns
+    -------
+    :obj:`xarray.DataArray`:
+        DataArray with geospatial (CF) attributes
+    """
     logger.debug('Reading vector as geodataframe')
     gdf = gpd.GeoDataFrame.from_file(vector)
     # remove invalid geometries
@@ -59,7 +113,7 @@ def read_vector(vector, res=None, column=None, value=1., compute_area=False,
                    all_touched=all_touched, merge_alg=merge_alg, fillvalue=fillvalue,
                    nodata=nodata)
 
-# TODO: merge read_df and read_df_link (as in read_vectori)
+# TODO: merge read_df and read_df_link (as in read_vector)
 def read_df(gdf, res=None, column=None, value=1., compute_area=False,
             dtype=np.float64, eea=False, epsg=None, bounds=None,
             grid=None, grid_mask=True,
@@ -131,12 +185,6 @@ def read_features(features, res, crs, bounds=None, compute_area=False,
 def read_features_like(da, features, compute_area=False, copy=True,
                        all_touched=True, merge_alg=rasterio.enums.MergeAlg.replace, fillvalue=0.,
                        grid_mask=0):
-    # TODO: not sure if copy is needed
-    # if copy:
-    #     raster = rgrid.copy()
-    # else:
-    #     raster = rgrid
-    # raster[:] = 0.
     if compute_area:
         # TODO: to be implemented
         # raster.rasterize_features_area(features)
