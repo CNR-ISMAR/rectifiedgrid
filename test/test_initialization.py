@@ -54,7 +54,7 @@ class TestInitialization(object):
         raster = os.path.join(GOOD_DATA, 'raster',
                               'test_grid.tif')
         grid = rg.read_raster(raster)
-        assert grid.shape == (1, 7, 5)
+        assert grid.shape == (7, 5)
 
     def test_eea(self):
         vector = os.path.join(os.path.dirname(__file__), 'air.shp')

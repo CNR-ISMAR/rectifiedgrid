@@ -196,11 +196,15 @@ def read_features_like(da, features, compute_area=False, copy=True,
                                   grid_mask=grid_mask)
 
 
-def read_raster(raster, masked=True, driver=None, epsg=None):
-    rgrid = rioxarray.open_rasterio(raster)
-
-    # TODO: deal masked data
+def read_raster(raster, band=1, epsg=None, **open_kwargs):
     # TODO: deal fill_value and nodata
+    # deal encoded_nodata
+    # manage on-fly reprojection and reproject_match
+    rgrid = rioxarray.open_rasterio(raster, **open_kwargs)
+    if rgrid.rio.nodata:
+        rgrid.where(rgrid != rgrid.rio.nodata)
+    if band:
+        return rgrid.sel(band=band).copy()
     return rgrid
 
 def rasterize_features(da, features, all_touched=True, merge_alg=rasterio.enums.MergeAlg.replace, fillvalue=0.,
