@@ -202,7 +202,7 @@ def read_raster(raster, band=1, epsg=None, **open_kwargs):
     # manage on-fly reprojection and reproject_match
     rgrid = rioxarray.open_rasterio(raster, **open_kwargs)
     if rgrid.rio.nodata:
-        rgrid.where(rgrid != rgrid.rio.nodata)
+        rgrid = rgrid.where(rgrid != rgrid.rio.nodata)
     if band:
         return rgrid.sel(band=band).copy()
     return rgrid
