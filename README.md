@@ -1,28 +1,37 @@
 RectifiedGrid
 =============
 
-RectifiedGrid is a Python package which, combining into a single class
-several pythonpackages (e.g. Numpy, SciPy, shapely, rasterio, fiona,
-geopandas, owslib, matplotlib-basemaps), simplifies geospatial
-grid-based analyses. Numpy is a notable package for scientific
-computing with a support for large, multi-dimensional
-arrays and matrices: RectifiedGrid extends the numpy MaskedArray class
-by adding geospatial functionalities (i.e. projection awareness,
-boundingboxes, raster algebra). RectifiedGrid employs rasterio and
-fiona under the hood for raster and vector I/O and owslibto access
-data through OGC interoperable services.
+**WARNING**: Starting from version 2.0.0, rectifiedgrid grid has been
+refactored basing basing on xarray and rioxarray packages. Several API
+have been changed.
 
-RectifiedGrid has been initialy developed to support Integrated
+RectifiedGrid is a Python package which, combining into a single class
+several python packages (e.g. xarray, rioxarray, SciPy, shapely,
+fiona, geopandas, owslib, Cartopy), simplifies geospatial grid-based
+analyses. Numpy is a notable package for scientific computing with a
+support for large, multi-dimensional arrays and matrices: starting
+from version 2.0.0, RectifiedGrid extends xarray introducing an "rg"
+accessor for adding additional functionalities (e.g. rasterization, 3D
+manipulation). RectifiedGrid employs rasterio and fiona under the hood
+for raster and vector I/O and owslib to access data through OGC
+interoperable services.
+
+RectifiedGrid has been initially developed to support Integrated
 Coastal Management and Maritime Spatial Planning analyses.
 
 Installation
 ============
-When using Rectifiedgrid, you need to make sure that Geopandas is installed with rtree support.
-Refer to following link for more informations: 
+When using RectifiedGrid, you need to make sure that Geopandas is installed with rtree support.
+Refer to following link for more informations:
 * http://geopandas.org/install.html#installing-with-pip
 * http://toblerity.org/rtree/install.html
 
-If you want to install Shapely dependency from source for compatibility with cartopy or if you want to use a different version of GEOS than the one included in the project wheels you should first install the GEOS library, Cython, and Numpy on your system (using apt, yum, brew, or other means) and then direct pip to ignore the binary wheels.
+If you want to install Shapely dependency from source for
+compatibility with cartopy or if you want to use a different version
+of GEOS than the one included in the project wheels you should first
+install the GEOS library, Cython, and Numpy on your system (using apt,
+yum, brew, or other means) and then direct pip to ignore the binary
+wheels.
 
 ```shell
 $ pip install shapely --no-binary shapely
@@ -31,7 +40,7 @@ $ pip install shapely --no-binary shapely
 Usage
 =====
 
-### Reading and plot GeoTIFF 
+### Reading and plot GeoTIFF
 
 ```python
 import rectifiedgrid as rg
