@@ -196,15 +196,28 @@ def read_features_like(da, features, compute_area=False, copy=True,
                                   grid_mask=grid_mask)
 
 
-def read_raster(raster, band=1, epsg=None, **open_kwargs):
+def read_raster(raster, band=1, epsg=None, grid=None, resampling=Resampling.bilinear,
+                fillvalue=0, **open_kwargs):
     # TODO: deal fill_value and nodata
     # deal encoded_nodata
     # manage on-fly reprojection and reproject_match
     rgrid = rioxarray.open_rasterio(raster, **open_kwargs)
     if rgrid.rio.nodata:
-        rgrid = rgrid.where(rgrid != rgrid.rio.nodata)
+        rgrid = (rgrid.where(rgrid != rgrid.rio.nodata)
+                 .rio.write_nodata(np.nan)
+                 )
     if band:
-        return rgrid.sel(band=band).copy()
+        rgrid = rgrid.sel(band=band).copy()
+    if grid is not None:
+        rgrid = (rgrid
+                 .rio.reproject_match(grid,
+                                      nodata=fillvalue) # rio.reproject nodata is use to initlialize the destination array
+                 .where(~grid.isnull())
+                 )
+    elif epsg is not None:
+        rgrid = rgrid.rio.reproject("epsg:{}".format(epsg),
+                                resampling=resampling,
+                                nodata=fillvalue) # rio.reproject nodata is use to initlialize the destination array
     return rgrid
 
 def rasterize_features(da, features, all_touched=True, merge_alg=rasterio.enums.MergeAlg.replace, fillvalue=0.,
@@ -218,6 +231,7 @@ def rasterize_features(da, features, all_touched=True, merge_alg=rasterio.enums.
         fill=fillvalue,
         all_touched=all_touched,
         merge_alg=merge_alg,
+        dtype = da.dtype
         # dtype=_minimize_dtype(data_values.dtype, fill),
     )
     x_dim = da.rio.x_dim
@@ -299,10 +313,10 @@ class RgAccessor:
         return raster
 
     def logrescale(self):
-        raster = self._obj.copy()
-        raster.rg.log()
-        raster.rg.rescale()
-        return raster
+        return (self._obj.copy()
+                .rg.log()
+                .rg.rescale()
+                )
 
     def replace_value(self, oldvalue, value):
         raster = self._obj.copy()
@@ -386,7 +400,8 @@ class RgAccessor:
                 scheme=None,
                 ncolors=10,
                 alpha=None,
-                extent_buffer=0
+                extent_buffer=0,
+                imshow=True
                 ):
 
         if ax is None:
@@ -398,6 +413,7 @@ class RgAccessor:
                                     resampling=Resampling.bilinear,
                                     nodata=np.nan)
         bounds = r.rio.bounds()
+        res = r.rio.resolution()
         img_extent = [bounds[0],
                       bounds[2],
                       bounds[1],
@@ -465,14 +481,19 @@ class RgAccessor:
             r = get_hs(r.values, cmap, norm=norm,
                        # blend_mode='soft'
                        )
-        mapimg = ax.imshow(r,
-                           origin='upper',
-                           cmap=cmap,
-                           extent=img_extent,
-                           norm=norm,
-                           zorder=1,
-                           alpha=alpha
-                           )
+        if imshow:
+            mapimg = r.plot.imshow(ax=ax,
+                                   cmap=cmap,
+                                   norm=norm,
+                                   zorder=1,
+                                   alpha=alpha,
+                                   add_colorbar=False)
+        else:
+            mapimg = r.plot(ax=ax,
+                            cmap=cmap,
+                            norm=norm,
+                            zorder=1,
+                            alpha=alpha)
 
         # ax.add_feature(cpf.LAND)
         # ax.add_feature(cpf.OCEAN)
