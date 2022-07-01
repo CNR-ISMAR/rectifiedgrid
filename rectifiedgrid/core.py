@@ -487,7 +487,8 @@ class RgAccessor:
                                    norm=norm,
                                    zorder=1,
                                    alpha=alpha,
-                                   add_colorbar=False)
+                                   add_colorbar=False,
+                                   add_labels=False)
         else:
             mapimg = r.plot(ax=ax,
                             cmap=cmap,
