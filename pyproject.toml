@@ -1,0 +1,41 @@
+[project]
+name = "rectifiedgrid"
+version = "3.0.1"
+dependencies = [
+    # data structures and analyses
+    "numpy",
+    "geopandas",
+    "scipy",
+    "rasterio",
+    "fiona",
+    "contextily",
+    "rioxarray",
+    # vector data utils
+    "shapely", # no-binary
+    "rtree",
+    "pandas",
+    # utils
+    "affine",
+    "matplotlib",
+    "mapclassify",
+    "gisdata",
+    "pyepsg",
+]
+requires-python = ">=3.7"
+authors = [{ name = "Stefano Menegon", email = "stefano.menegon@cnr.it" }]
+description = "RectifiedGrid is a python module to deal with rectified grid."
+readme = "README.md"
+license = { text = "GPLv3" }
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Topic :: Utilities",
+    "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
+]
+
+[project.urls]
+Repository = "https://github.com/CNR-ISMAR/rectifiedgrid"
+"Bug Tracker" = "https://github.com/CNR-ISMAR/rectifiedgrid/issues"
+
+[build-system]
+requires = ["setuptools >= 61.0"]
+build-backend = "setuptools.build_meta"
