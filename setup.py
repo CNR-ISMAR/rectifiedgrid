@@ -8,7 +8,7 @@ def read(fname):
 
 setup(
     name="rectifiedgrid",  # or RectifiedGrid
-    version="2.0.3",
+    version="2.0.4",
     author="Stefano Menegon",
     author_email="ste.menegon@gmail.com",
     description="RectifiedGrid is a python module to deal with rectified grid.",
@@ -22,13 +22,10 @@ setup(
         'numpy',
         'geopandas',
         'scipy',
-        'Cartopy<0.20',
-        # I/O
         'rasterio',
         'fiona',
-
+        'contextily',
         'rioxarray',
-
         # vector data utils
         'shapely', # no-binary
         'rtree',

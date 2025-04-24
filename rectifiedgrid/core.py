@@ -1,6 +1,4 @@
 import logging
-# import copy as copyp
-# import numbers
 import rioxarray
 from rioxarray.rioxarray import affine_to_coords
 import xarray
@@ -11,29 +9,18 @@ from .hillshade import get_hs
 from affine import Affine
 from rasterio.features import rasterize
 import rasterio
-from rasterio.warp import reproject
-import cartopy
-import cartopy.feature as cpf
-from cartopy.mpl.gridliner import LONGITUDE_FORMATTER, LATITUDE_FORMATTER
-import cartopy.io.img_tiles as cimgt
+import contextily as ctx
 import pyproj
 
 from rasterio.enums import Resampling
-from rasterio.warp import calculate_default_transform
-
-from shapely.geometry import box, Point
-from shapely import ops
 from rtree.index import Index as RTreeIndex
 from scipy import ndimage
-from scipy import interpolate
 
 from matplotlib.colors import Normalize, SymLogNorm
 import matplotlib.pyplot as plt
 from matplotlib import colors
 from matplotlib.ticker import LogFormatter
 import mapclassify
-from rasterio.enums import MergeAlg
-
 
 logger = logging.getLogger(__name__)
 
@@ -401,27 +388,24 @@ class RgAccessor:
                 ncolors=10,
                 alpha=None,
                 extent_buffer=0,
-                imshow=True
+                imshow=True,
+                figsize=(10, 10),
+                basemap_provider=None,
+                openseamap=False,
                 ):
 
         if ax is None:
-            cprj = cartopy.crs.Mercator()
-            ax = plt.gca(projection=cprj)
-        elif not hasattr(ax, "projection"):
-            raise AttributeError("Passed axes doesn't have projection attribute")
-        r = self._obj.rio.reproject(ax.projection.proj4_params,
+            fig, ax = plt.subplots(figsize=figsize)
+
+        r = self._obj.rio.reproject("EPSG:3857",
                                     resampling=Resampling.bilinear,
                                     nodata=np.nan)
         bounds = r.rio.bounds()
         res = r.rio.resolution()
-        img_extent = [bounds[0],
-                      bounds[2],
-                      bounds[1],
-                      bounds[3]]
-        img_extent_buffer = [bounds[0] - extent_buffer,
-                             bounds[2] + extent_buffer,
-                             bounds[1] - extent_buffer,
-                             bounds[3] + extent_buffer]
+        bounds_buffer = [bounds[0] - extent_buffer,
+                         bounds[1] - extent_buffer,
+                         bounds[2] + extent_buffer,
+                         bounds[3] + extent_buffer]
 
         if maptype == 'minimal':
             coast = True,
@@ -455,7 +439,7 @@ class RgAccessor:
 
         if scheme is not None:
             # TODO: add check options compatibility (es. schema override norm, log=True and schema doesn't work together)
-            scheme = getattr(mapclassify, scheme)(self.values.flatten(), ncolors)
+            scheme = getattr(mapclassify, scheme)(self._obj.to_series().dropna().values, ncolors)
             bins = scheme.bins
             bounds = [scheme.yb.min()] + scheme.bins.tolist()
             cm = cmap
@@ -466,10 +450,6 @@ class RgAccessor:
 
         # if bluemarble:
         #     m.bluemarble()
-
-        if etopo:
-            ax.add_image(cimgt.Stamen('terrain-background'), zoomlevel)
-
         # if arcgis:
         #     m.arcgisimage(service='ESRI_Imagery_World_2D',
         #                   xpixels=arcgisxpixels, verbose=True)
@@ -478,9 +458,10 @@ class RgAccessor:
         #                 vmin=vmin, vmax=vmax)
 
         if hillshade:
-            r = get_hs(r.values, cmap, norm=norm,
-                       # blend_mode='soft'
-                       )
+            pass
+            # r = get_hs(r.values, cmap, norm=norm,
+            #            # blend_mode='soft'
+            #            )
         if imshow:
             mapimg = r.plot.imshow(ax=ax,
                                    cmap=cmap,
@@ -494,7 +475,8 @@ class RgAccessor:
                             cmap=cmap,
                             norm=norm,
                             zorder=1,
-                            alpha=alpha)
+                            alpha=alpha,
+                            add_labels=False)
 
         # ax.add_feature(cpf.LAND)
         # ax.add_feature(cpf.OCEAN)
@@ -504,21 +486,18 @@ class RgAccessor:
         #
 
         if countries:
-            ax.add_feature(cpf.BORDERS, linestyle=':', zorder=2)
+            pass
+            # ax.add_feature(cpf.BORDERS, linestyle=':', zorder=2)
 
         if coast:
-            # ax.add_feature(cpf.COASTLINE)
-            ax.coastlines(resolution=coast_resolution, zorder=3)
+            pass
+            # ax.coastlines(resolution=coast_resolution, zorder=3)
 
         if rivers:
-            ax.add_feature(cpf.RIVERS, zorder=4)
+            pass
+            # ax.add_feature(cpf.RIVERS, zorder=4)
         if grid:
-            # m.drawparallels(np.arange(-90, 90, gridrange), labels=[1, 0, 0, 0], fontsize=10)
-            # m.drawmeridians(np.arange(-90, 90, gridrange), labels=[0, 0, 0, 1], fontsize=10)
-            gl = ax.gridlines(draw_labels=True)
-            gl.xlabels_top = gl.ylabels_right = False
-            gl.xformatter = LONGITUDE_FORMATTER
-            gl.yformatter = LATITUDE_FORMATTER
+            ax.grid(True, which='both', color='gray', linestyle='--', linewidth=0.5)
         if legend:
             if logcolor:
                 formatter = LogFormatter(10,
@@ -529,7 +508,18 @@ class RgAccessor:
             else:
                 plt.colorbar(mapimg, orientation='vertical', ax=ax, ticks=ticks)
 
-        ax.set_extent(img_extent_buffer, crs=ax.projection)
+        if etopo:
+            pass
+
+        ax.set_xlim(bounds_buffer[0], bounds_buffer[2])
+        ax.set_ylim(bounds_buffer[1], bounds_buffer[3])
+
+        if basemap_provider:
+            ctx.add_basemap(ax, source=basemap_provider, crs=r.rio.crs)
+
+        ax.set_xlabel('')
+        ax.set_ylabel('')
+
         return ax, mapimg
 
     def crop(self, value=np.nan):
